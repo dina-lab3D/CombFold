@@ -30,3 +30,7 @@
 *.exe
 *.out
 *.app
+
+# Other
+.DS_Store
+CombinatorialAssembler/.vscode/*

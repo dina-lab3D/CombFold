@@ -131,7 +131,7 @@ int main(int argc, char *argv[]) {
   std::cerr << "Before process input" << std::endl;
   std::string argv_str(argv[0]);
   std::string base = argv_str.substr(0, argv_str.find_last_of("/"));
-  std::string chemLibFileName = base + "/chem.lib";
+  std::string chemLibFileName = base + "/chem_params.txt";
   BBContainer bbContainer(suFileName, penetrationThr, chemLibFileName);
   bbContainer.readTransformationFiles(prefix, transNumToRead);
 
