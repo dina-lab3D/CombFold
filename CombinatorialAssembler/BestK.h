@@ -5,15 +5,14 @@
 #include <mutex>
 
 /**
-*This struct is used for comparison of two SuperBBs
-*/
+ *This struct is used for comparison of two SuperBBs
+ */
 struct comp {
-  bool operator()(const std::shared_ptr<SuperBB> &lhs, const std::shared_ptr<SuperBB> &rhs) const {
+    bool operator()(const std::shared_ptr<SuperBB> &lhs, const std::shared_ptr<SuperBB> &rhs) const {
 
-
-    return lhs->weightedTransScore_ < rhs->weightedTransScore_;
-    //return lhs->transScore_ < rhs->transScore_;
-  }
+        return lhs->weightedTransScore_ < rhs->weightedTransScore_;
+        // return lhs->transScore_ < rhs->transScore_;
+    }
 };
 
 struct compWeightedTrans {
@@ -29,70 +28,70 @@ struct compWeightedTrans {
 */
 class BestK : public std::multiset<std::shared_ptr<SuperBB>, comp> {
 
-public:
-  BestK(unsigned int k, bool toDel = true) : k_(k), toDel_(toDel), curMinScore(-1) {}
+  public:
+    BestK(unsigned int k, bool toDel = true) : k_(k), toDel_(toDel), curMinScore(-1) {}
 
-  BestK() : k_(500), toDel_(true) {}
+    BestK() : k_(500), toDel_(true) {}
 
-  BestK(BestK&& other):std::multiset<std::shared_ptr<SuperBB>, comp>(other){
-    std::lock_guard<std::mutex> locker(_mu);
-    toDel_=other.toDel_;
-    other.toDel_=false;
-    k_=other.k_;
-    curMinScore=other.curMinScore;
-  }
-
-  BestK& operator=(BestK&& other){
-    std::lock_guard<std::mutex> locker(_mu);
-    *(std::multiset<std::shared_ptr<SuperBB>, comp>*)this = *(std::multiset<std::shared_ptr<SuperBB>, comp>*)(&other);
-    toDel_=other.toDel_;
-    other.toDel_=false;
-    k_=other.k_;
-    curMinScore=other.curMinScore;
-    return *this;
-  }
-
-//    int score(const std::shared_ptr<SuperBB> &sbb) const { return sbb->transScore_; }
-    float score(const std::shared_ptr<SuperBB> &sbb) const { return sbb->weightedTransScore_; }
-
-  int minScore() const { return curMinScore; }
-
-  void setK(int k) { k_ = k; }
-
-  bool push(std::shared_ptr<SuperBB> in) {
-    std::lock_guard<std::mutex> locker(_mu);
-    if (size() < k_) {
-      insert(in);
-      return true;
-    } else {
-
-      if(internalMinScore() < score(in)){
-        erase(begin());
-        insert(in);
-        curMinScore=score(*begin());
-        return true;
-      }
+    BestK(BestK &&other) : std::multiset<std::shared_ptr<SuperBB>, comp>(other) {
+        std::lock_guard<std::mutex> locker(_mu);
+        toDel_ = other.toDel_;
+        other.toDel_ = false;
+        k_ = other.k_;
+        curMinScore = other.curMinScore;
     }
 
-    return false;
-  }
+    BestK &operator=(BestK &&other) {
+        std::lock_guard<std::mutex> locker(_mu);
+        *(std::multiset<std::shared_ptr<SuperBB>, comp> *)this =
+            *(std::multiset<std::shared_ptr<SuperBB>, comp> *)(&other);
+        toDel_ = other.toDel_;
+        other.toDel_ = false;
+        k_ = other.k_;
+        curMinScore = other.curMinScore;
+        return *this;
+    }
 
-    bool push_cluster(std::shared_ptr<SuperBB> in, double rmsd, std::vector<std::vector<unsigned int>>& identGroups) {
+    //    int score(const std::shared_ptr<SuperBB> &sbb) const { return sbb->transScore_; }
+    float score(const std::shared_ptr<SuperBB> &sbb) const { return sbb->weightedTransScore_; }
+
+    int minScore() const { return curMinScore; }
+
+    void setK(int k) { k_ = k; }
+
+    bool push(std::shared_ptr<SuperBB> in) {
+        std::lock_guard<std::mutex> locker(_mu);
+        if (size() < k_) {
+            insert(in);
+            return true;
+        } else {
+
+            if (internalMinScore() < score(in)) {
+                erase(begin());
+                insert(in);
+                curMinScore = score(*begin());
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    bool push_cluster(std::shared_ptr<SuperBB> in, double rmsd, std::vector<std::vector<unsigned int>> &identGroups) {
         std::lock_guard<std::mutex> locker(_mu);
 
         if (internalMinScore() > score(in))
             return false;
 
-        for(auto it = begin(); it != end(); it++) {
+        for (auto it = begin(); it != end(); it++) {
             if (score(in) <= score(*it) && (*it)->calcRmsd(*in, identGroups) < rmsd)
                 return false;
         }
 
-        for (auto it = begin(); it != end(); ) {
-            if(score(in) > score(*it) && (*it)->calcRmsd(*in, identGroups) < rmsd) {
+        for (auto it = begin(); it != end();) {
+            if (score(in) > score(*it) && (*it)->calcRmsd(*in, identGroups) < rmsd) {
                 erase(it++);
-            }
-            else {
+            } else {
                 ++it;
             }
         }
@@ -102,60 +101,62 @@ public:
         }
 
         insert(in);
-        curMinScore=score(*begin());
+        curMinScore = score(*begin());
         return true;
     }
 
-  void cluster(BestK& clusteredBest, double rmsd, std::vector<std::vector<unsigned int>>& identGroups) const {
+    void cluster(BestK &clusteredBest, double rmsd, std::vector<std::vector<unsigned int>> &identGroups) const {
 
-    if(size() == 0) return;
-    const std::shared_ptr<SuperBB> firstSBB = *rbegin();
-    if(firstSBB->size() == 2) { // don't cluster
-      for(auto it = rbegin(); it!= rend(); it++) {
-        clusteredBest.insert(*it);
-      }
-    } else {
-      std::vector<bool> clustered(size(), false);
-      int i=0;
+        if (size() == 0)
+            return;
+        const std::shared_ptr<SuperBB> firstSBB = *rbegin();
+        if (firstSBB->size() == 2) { // don't cluster
+            for (auto it = rbegin(); it != rend(); it++) {
+                clusteredBest.insert(*it);
+            }
+        } else {
+            std::vector<bool> clustered(size(), false);
+            int i = 0;
 
-      for(auto it = rbegin(); it!= rend(); it++, i++) {
-        const std::shared_ptr<SuperBB> refSBB = *it;
-        // std::cout << "clustering " << i << " clsutered:" << clustered[i] << std::endl;
-        if(!clustered[i]) {
-          clustered[i] = true;
-          clusteredBest.insert(refSBB);
+            for (auto it = rbegin(); it != rend(); it++, i++) {
+                const std::shared_ptr<SuperBB> refSBB = *it;
+                // std::cout << "clustering " << i << " clsutered:" << clustered[i] << std::endl;
+                if (!clustered[i]) {
+                    clustered[i] = true;
+                    clusteredBest.insert(refSBB);
+                }
+
+                // TODO: maybe shouldn't cluster more if already clustered (can lead to drift)
+
+                // cluster to other SBBs
+                int j = 0;
+                // for(auto it2 = begin(); it2!= end(); it2++, j++) {
+                for (auto it2 = rbegin(); it2 != rend(); it2++, j++) {
+                    if (!clustered[j] && (*it2)->calcRmsd(*refSBB, identGroups) < rmsd) {
+                        clustered[j] = true;
+                    }
+                }
+            }
         }
-
-        // TODO: maybe shouldn't cluster more if already clustered (can lead to drift)
-
-        // cluster to other SBBs
-        int j = 0;
-        // for(auto it2 = begin(); it2!= end(); it2++, j++) {
-        for(auto it2 = rbegin(); it2!= rend(); it2++, j++) {
-            if(!clustered[j] && (*it2)->calcRmsd(*refSBB, identGroups) < rmsd) {
-            clustered[j] = true;
-          }
-        }
-      }
     }
-  }
 
-  virtual ~BestK() {}
+    virtual ~BestK() {}
 
-private:
-  int internalMinScore() {
-    if (size() < k_) return -1;
-    return score(*begin());
-  }
+  private:
+    int internalMinScore() {
+        if (size() < k_)
+            return -1;
+        return score(*begin());
+    }
 
-  BestK(const BestK& other);
-  BestK& operator=(const BestK& other);
+    BestK(const BestK &other);
+    BestK &operator=(const BestK &other);
 
-private:
-  std::mutex _mu;
-  unsigned int k_;
-  bool toDel_;
-  int curMinScore;
+  private:
+    std::mutex _mu;
+    unsigned int k_;
+    bool toDel_;
+    int curMinScore;
 };
 
 #endif /* BESTK_H */
