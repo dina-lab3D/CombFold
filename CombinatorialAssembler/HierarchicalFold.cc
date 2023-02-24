@@ -185,13 +185,16 @@ void HierarchicalFold::createSymmetry(std::vector<std::shared_ptr<SuperBB>> iden
         transCount++;
 
     std::cout << "number of transformations:" << transCount << std::endl;
-
+    unsigned int addedSymCount = 0;
     for (unsigned int transNum = 0; transNum < transCount; transNum++) {
         std::cout << "checking trans indexed" << transNum << std::endl;
         // create symSBB for a trans, this is cumbersome because I don't really know how to handle transformations
         std::shared_ptr<SuperBB> symSBB = identBBs[0];
         for (unsigned int i = 1; i < identBBs.size(); i++) {
             unsigned int count = -1;
+
+            // There is a memory issue here, I create TransIterator2 with symSBB as bb1, but then I override it 
+            // and freeing the memory(?) of bb1_, so it is important to break after chanigng symSBB
             for (TransIterator2 it(*symSBB, *identBBs[i], symSBB->bbs_[i - 1]->getID(), identBBs[i]->bbs_[0]->getID());
                  !it.isAtEnd(); it++) {
                 count++;
@@ -203,29 +206,10 @@ void HierarchicalFold::createSymmetry(std::vector<std::shared_ptr<SuperBB>> iden
                 std::cout << "adding trans " << it.transformation() << " **** " << it.getScore() << std::endl;
                 // symSBB = createJoined(*symSBB, *identBBs[i], it.transformation(), 0, 0, 0, step, it.getScore());
                 symSBB = createJoined(*symSBB, *identBBs[i], it.transformation(), 0, 0, 0, step, transScore);
+                break;
             }
         }
-
-        //    for (TransIterator2 it(*identBBs[0], *identBBs[1], identBBs[0]->bbs_[0]->getID(),
-        //    identBBs[1]->bbs_[0]->getID()); !it.isAtEnd(); it++) {
-        //        std::cout << "started trans check, bb_size:" << identBBs.size() << " trans " << it.transformation() <<
-        //        std::endl;
-        //
-        //
-        //        // create SBB from all single SU using iterated transformation
-        //        FoldStep step(identBBs[0]->bbs_[0]->getID(), identBBs[0]->bbs_[0]->getID(), it.getScore());
-        //        RigidTrans3& trans = it.transformation();
-        //        RigidTrans3& baseTrans = trans;
-        //        std::shared_ptr<SuperBB> symSBB = createJoined(*identBBs[0], *identBBs[1], trans,
-        //                                                       0, 0, 0, step, it.getScore());
-        //        std::cout << "created base" << std::endl;
-        //        for(unsigned int i=2; i < identBBs.size(); i++) {
-        //            FoldStep step(identBBs[i-1]->bbs_[0]->getID(), identBBs[i]->bbs_[0]->getID(), it.getScore());
-        //            trans = trans * baseTrans;
-        //            std::cout << "adding trans " << baseTrans << " **** " << trans << std::endl;
-        //            symSBB = createJoined(*symSBB, *identBBs[i], trans, 0, 0, 0, step, it.getScore());
-        //        }
-        std::cout << "created symSBB" << std::endl;
+        std::cout << "created possibly symSBB" << std::endl;
 
         // check bb penetration between each 2 chains
         unsigned int totalUsedAtoms = 0;
@@ -273,14 +257,48 @@ void HierarchicalFold::createSymmetry(std::vector<std::shared_ptr<SuperBB>> iden
         }
         float allowedDistFactor = 1.5 + (symSBB->size_ - 3) * 0.25;
         if ((centroids[0] - centroids[1]).norm2() * allowedDistFactor < (centroids[0] - centroids.back()).norm2()) {
-            std::cout << "dropping " << identBBs.size() << " because centroids "
+            std::cout << "dropping " << identBBs.size() << " because centroids distance "
                       << (centroids[0] - centroids[1]).norm2() << " : " << (centroids[0] - centroids.back()).norm2()
                       << std::endl;
             continue;
         }
+
+        // verify that centroids are first all increasing distance from first centroid and then all decreasing distance
+        // from first centroid
+        bool increasing = true;
+        bool shouldContinue = false;
+        for (unsigned int i = 1; i < centroids.size(); i++) {
+            if (increasing) {
+                if ((centroids[i] - centroids[0]).norm2() < (centroids[i - 1] - centroids[0]).norm2()) {
+                    increasing = false;
+                }
+            } else {
+                if ((centroids[i] - centroids[0]).norm2() > (centroids[i - 1] - centroids[0]).norm2()) {
+                    std::cout << "dropping " << identBBs.size() << " because centroids not increasing and decreasing"
+                              << std::endl;
+                    shouldContinue = true;
+                    break;
+                }
+            }
+        }
+        if (shouldContinue)
+            continue;
+        if (increasing) {
+            std::cout << "dropping " << identBBs.size() << " because centroids only increasing " << std::endl;
+            continue;
+        }
+
         std::cout << "added with score " << symSBB->weightedTransScore_ << std::endl;
         results.push(symSBB);
+        addedSymCount++;
     }
+
+
+    unsigned long groupIdentifier = 0;
+    for (unsigned int i = 0; i < identBBs.size(); i++) {
+        groupIdentifier += identBBs[i]->bbs_[0]->bitId();
+    }
+    std::cout << "Created " << addedSymCount << " Symmetrical for " << groupIdentifier << std::endl;
 }
 
 void HierarchicalFold::fold(const std::string &outFileNamePrefix) {
@@ -350,25 +368,21 @@ void HierarchicalFold::fold(const std::string &outFileNamePrefix) {
         keptResultsByLength[i] = new BestK(K_);
 
     for (std::vector<unsigned int> identGroup : identGroups) {
-        std::vector<std::shared_ptr<SuperBB>> groupSBBs;
-        for (unsigned int i : identGroup) {
-            groupSBBs.push_back(*(clusteredSBBS_[1 << i].begin()));
-        }
-        if (groupSBBs.size() >= 3 && groupSBBs.size() == N_) {
-            std::cout << "searching for size " << groupSBBs.size() << " has "
-                      << keptResultsByLength.count(groupSBBs.size()) << std::endl;
-            createSymmetry(groupSBBs, *keptResultsByLength[groupSBBs.size()]);
-            std::cout << "Created " << keptResultsByLength[groupSBBs.size()]->size() << " Symmetrical" << std::endl;
+        for (unsigned int groupDivider = 1; identGroup.size() / groupDivider >= 5; groupDivider++) {
+            if ((identGroup.size() % groupDivider) != 0)
+                continue;
+            unsigned int groupSize = identGroup.size() / groupDivider;
+            for (unsigned int i = 0; i < groupDivider; i++) {
+                std::vector<std::shared_ptr<SuperBB>> groupSBBs;
+                for (unsigned int j = 0; j < groupSize; j++) {
+                    groupSBBs.push_back(*(clusteredSBBS_[1 << identGroup[i * groupSize + j]].begin()));
+                }
+                std::cout << "searching for size " << groupSBBs.size() << " has "
+                          << keptResultsByLength.count(groupSBBs.size()) << std::endl;
+                createSymmetry(groupSBBs, *keptResultsByLength[groupSBBs.size()]);
+            }
         }
     }
-
-    /* TODO for symmetry to work:
-     * 1. instead of adding to keptResultsByLength, add to some "buffer" BestK and at the start of each length iteration
-     * dump the buffer into best_k_by_id
-     * 2. in createSymmetry - change so that we will not use the trans score, but a higher one
-     *
-     *
-     */
 
     for (unsigned int length = 2; length <= N_; length++) { // # subunits iteration
         std::cout << "*** running iteration " << length
