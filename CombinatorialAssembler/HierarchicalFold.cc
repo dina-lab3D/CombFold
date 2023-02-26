@@ -200,7 +200,8 @@ void HierarchicalFold::createSymmetry(std::vector<std::shared_ptr<SuperBB>> iden
                 count++;
                 if (count != transNum)
                     continue;
-                float transScore = 95 + it.getScore() / 20;
+                // float transScore = 95 + it.getScore() / 20;
+                float transScore = it.getScore() + it.getScore() / 5;
 
                 FoldStep step(symSBB->bbs_[i - 1]->getID(), identBBs[i]->bbs_[0]->getID(), transScore);
                 std::cout << "adding trans " << it.transformation() << " **** " << it.getScore() << std::endl;
@@ -212,8 +213,8 @@ void HierarchicalFold::createSymmetry(std::vector<std::shared_ptr<SuperBB>> iden
         std::cout << "created possibly symSBB" << std::endl;
 
         // check bb penetration between each 2 chains
-        unsigned int totalUsedAtoms = 0;
-        unsigned int bbPenetrations = 0;
+        double maxPenetration = 0;
+        bool shouldContinuePen = false;
         for (unsigned int i = 0; i < symSBB->size_; i++) {
             const BB &bb1 = *symSBB->bbs_[i];
             RigidTrans3 t1 = (!symSBB->trans_[i]);
@@ -222,6 +223,8 @@ void HierarchicalFold::createSymmetry(std::vector<std::shared_ptr<SuperBB>> iden
                 RigidTrans3 t2 = t1 * symSBB->trans_[j];
 
                 const BB *pBB1 = &bb1, *pBB2 = &bb2;
+                unsigned int totalUsedAtoms = 0;
+                unsigned int bbPenetrations = 0;
 
                 for (Molecule<Atom>::const_iterator it = pBB2->caAtoms_.begin(); it != pBB2->caAtoms_.end(); it++) {
                     if (it->getTempFactor() < minTemperatureToConsiderCollision) {
@@ -240,21 +243,33 @@ void HierarchicalFold::createSymmetry(std::vector<std::shared_ptr<SuperBB>> iden
                         }
                     }
                 }
+
+                if ((bbPenetrations / (1.0 * totalUsedAtoms)) > 0.2) {
+                    std::cout << "dropping " << identBBs.size() << " because penetration "
+                            << bbPenetrations / (1.0 * totalUsedAtoms) << std::endl;
+                    shouldContinuePen = true;
+                    break;
+                }
+
+                maxPenetration = std::max(maxPenetration, bbPenetrations / (1.0 * totalUsedAtoms));
             }
+            if (shouldContinuePen)
+                break;
         }
-        std::cout << "checked penetrations" << std::endl;
-        // if above some TH (for everything, not per chain) (20%) - drop
-        if (bbPenetrations / (1.0 * totalUsedAtoms) > 0.2) {
-            std::cout << "dropping " << identBBs.size() << " because penetration "
-                      << bbPenetrations / (1.0 * totalUsedAtoms) << std::endl;
+        if (shouldContinuePen)
             continue;
-        }
+        std::cout << "checked penetrations ratio max: " << maxPenetration << std::endl;
+        // if above some TH (for everything, not per chain) (20%) - drop
+        
 
         // if last and first centers are the farthest - drop
         std::vector<Vector3> centroids;
         for (unsigned int i = 0; i < symSBB->size_; i++) {
             centroids.push_back(symSBB->trans_[i] * symSBB->bbs_[i]->getCM());
         }
+        std::cout << "centroids distance " << (centroids[0] - centroids[1]).norm2() << " : "
+                  << (centroids[0] - centroids.back()).norm2() << std::endl;
+
         float allowedDistFactor = 1.5 + (symSBB->size_ - 3) * 0.25;
         if ((centroids[0] - centroids[1]).norm2() * allowedDistFactor < (centroids[0] - centroids.back()).norm2()) {
             std::cout << "dropping " << identBBs.size() << " because centroids distance "
@@ -287,6 +302,8 @@ void HierarchicalFold::createSymmetry(std::vector<std::shared_ptr<SuperBB>> iden
             std::cout << "dropping " << identBBs.size() << " because centroids only increasing " << std::endl;
             continue;
         }
+
+        
 
         std::cout << "added with score " << symSBB->weightedTransScore_ << std::endl;
         results.push(symSBB);
