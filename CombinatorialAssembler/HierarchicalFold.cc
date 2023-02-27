@@ -303,13 +303,10 @@ void HierarchicalFold::createSymmetry(std::vector<std::shared_ptr<SuperBB>> iden
             continue;
         }
 
-        
-
         std::cout << "added with score " << symSBB->weightedTransScore_ << std::endl;
         results.push(symSBB);
         addedSymCount++;
     }
-
 
     unsigned long groupIdentifier = 0;
     for (unsigned int i = 0; i < identBBs.size(); i++) {
@@ -381,8 +378,9 @@ void HierarchicalFold::fold(const std::string &outFileNamePrefix) {
     }
 
     // populate with homomers subunits
+    std::map<unsigned int, BestK *> precomputedResults;
     for (unsigned int i = 2; i <= N_; i++)
-        keptResultsByLength[i] = new BestK(K_);
+        precomputedResults[i] = new BestK(K_);
 
     for (std::vector<unsigned int> identGroup : identGroups) {
         for (unsigned int groupDivider = 1; identGroup.size() / groupDivider >= 5; groupDivider++) {
@@ -395,8 +393,8 @@ void HierarchicalFold::fold(const std::string &outFileNamePrefix) {
                     groupSBBs.push_back(*(clusteredSBBS_[1 << identGroup[i * groupSize + j]].begin()));
                 }
                 std::cout << "searching for size " << groupSBBs.size() << " has "
-                          << keptResultsByLength.count(groupSBBs.size()) << std::endl;
-                createSymmetry(groupSBBs, *keptResultsByLength[groupSBBs.size()]);
+                          << precomputedResults.count(groupSBBs.size()) << std::endl;
+                createSymmetry(groupSBBs, *precomputedResults[groupSBBs.size()]);
             }
         }
     }
@@ -404,10 +402,10 @@ void HierarchicalFold::fold(const std::string &outFileNamePrefix) {
     for (unsigned int length = 2; length <= N_; length++) { // # subunits iteration
         std::cout << "*** running iteration " << length
                   << " prev kept results: " << keptResultsByLength[length - 1]->size() << std::endl;
-        BestK *newKept = keptResultsByLength[length];
+        BestK *newKept = new BestK(K_);
         std::map<unsigned long, BestK *> best_k_by_id;
 
-        for (auto it1 = newKept->begin(); it1 != newKept->end(); it1++) {
+        for (auto it1 = precomputedResults[length]->begin(); it1 != precomputedResults[length]->end(); it1++) {
             unsigned long currResSet = (**it1).bitIds();
             if (best_k_by_id.count(currResSet) == 0)
                 best_k_by_id[currResSet] = new BestK(K_);
@@ -445,10 +443,13 @@ void HierarchicalFold::fold(const std::string &outFileNamePrefix) {
                     if (resCountBefore < best_k_by_id[currResSet]->size())
                         std::cout << "found more for " << currResSet << " based on " << setA << " and " << setB
                                   << " before: " << resCountBefore << " after: " << best_k_by_id[currResSet]->size()
-                                  << " min_score: " << best_k_by_id[currResSet]->minScore() << std::endl;
+                                  << " scores " << best_k_by_id[currResSet]->minScore() << ":"
+                                  << best_k_by_id[currResSet]->maxScore() << std::endl;
                 }
             }
         }
+
+        std::map<unsigned long, BestK *> bestForSubunitId;
         for (const auto &[currResSet, currBestK] : best_k_by_id) {
             if (currBestK->size() > 0) {
                 BestK *clusteredBestK = clusteredSBBS_.newBestK(currResSet);
@@ -473,11 +474,22 @@ void HierarchicalFold::fold(const std::string &outFileNamePrefix) {
                     // for(auto it=currBestK->rbegin(); it != currBestK->rend(); it++)
                     //     clusteredBestK->insert(*it);
                 }
+
                 std::cerr << "clustering resSet " << currResSet << " before: " << currBestK->size() << " after "
-                          << clusteredSBBS_[currResSet].size() << std::endl;
+                          << clusteredSBBS_[currResSet].size() << " scores " << clusteredSBBS_[currResSet].minScore()
+                          << ":" << clusteredSBBS_[currResSet].maxScore() << std::endl;
+
+                for (unsigned long i = 0; i < N_; i++) {
+                    if ((currResSet & (1 << i)) != 0) {
+                        if (bestForSubunitId.count(i) == 0) {
+                            bestForSubunitId[i] = new BestK(1);
+                        }
+                        bestForSubunitId[i]->push(*clusteredBestK->rbegin());
+                    }
+                }
 
                 unsigned int count = 0;
-                for (auto it1 = clusteredSBBS_[currResSet].begin(); it1 != clusteredSBBS_[currResSet].end(); it1++) {
+                for (auto it1 = clusteredSBBS_[currResSet].rbegin(); it1 != clusteredSBBS_[currResSet].rend(); it1++) {
                     newKept->push(*it1);
                     count += 1;
                     if (count >= maxResultPerResSet)
@@ -488,12 +500,21 @@ void HierarchicalFold::fold(const std::string &outFileNamePrefix) {
             //        delete currBestK;
         }
 
+        keptResultsByLength[length] = new BestK(K_ + bestForSubunitId.size());
+        for (auto it1 = newKept->begin(); it1 != newKept->end(); it1++) {
+            keptResultsByLength[length]->push(*it1);
+        }
+        for (const auto &[subunitId, currBestK] : bestForSubunitId) {
+            keptResultsByLength[length]->push(*currBestK->rbegin());
+        }
+
+
         // just for print
         std::map<unsigned int, unsigned int> count_new_kept_by_bb;
         std::map<unsigned int, unsigned int> count_new_kept_by_resSet;
         for (unsigned int bit_index = 0; bit_index < N_; bit_index++)
             count_new_kept_by_bb[bit_index] = 0;
-        for (auto it1 = newKept->begin(); it1 != newKept->end(); it1++) {
+        for (auto it1 = keptResultsByLength[length]->begin(); it1 != keptResultsByLength[length]->end(); it1++) {
             if (count_new_kept_by_resSet.count((**it1).bitIds()) == 0)
                 count_new_kept_by_resSet[(**it1).bitIds()] = 0;
             count_new_kept_by_resSet[(**it1).bitIds()] += 1;
@@ -503,6 +524,8 @@ void HierarchicalFold::fold(const std::string &outFileNamePrefix) {
                 }
         }
 
+        std::cout << "scores of saved " << keptResultsByLength[length]->minScore() << ":"
+                  << keptResultsByLength[length]->maxScore() << std::endl;
         std::cout << "new kept results by chain ";
         for (const auto &elem : count_new_kept_by_bb)
             std::cout << elem.first << ":" << elem.second << ", ";

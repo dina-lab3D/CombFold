@@ -56,6 +56,11 @@ class BestK : public std::multiset<std::shared_ptr<SuperBB>, comp> {
     float score(const std::shared_ptr<SuperBB> &sbb) const { return sbb->weightedTransScore_; }
 
     int minScore() const { return curMinScore; }
+    int maxScore() const { 
+        if (size() == 0)
+            return 0;
+        return score(*rbegin()); 
+    }
 
     void setK(int k) { k_ = k; }
 
