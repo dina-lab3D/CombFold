@@ -2,7 +2,8 @@ BOOST_INCLUDE = /opt/homebrew/include
 BOOST_LIB = /opt/homebrew/lib/
 
 CC=g++
-CFLAGS=-c -Wall -I./libs_gamb -I./libs_DockingLib -I$(BOOST_INCLUDE) -O2 --std=c++11 # -fexpensive-optimizations -ffast-math
+# CFLAGS=-c -Wall -I./libs_gamb -I./libs_DockingLib -I$(BOOST_INCLUDE) -O2 --std=c++11 # -fexpensive-optimizations -ffast-math
+CFLAGS=-c -Wall -I./libs_gamb -I./libs_DockingLib -I$(BOOST_INCLUDE) -g -O2 --std=c++11 # -fexpensive-optimizations -ffast-math
 # CFLAGS=-c -Wall -I./libs_gamb -I./libs_DockingLib -I$(BOOST_INCLUDE) -O0 -g --std=c++11 # -fexpensive-optimizations -ffast-math
 
 SOURCES_MAIN = $(wildcard *.cc)

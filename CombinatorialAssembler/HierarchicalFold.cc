@@ -201,7 +201,12 @@ void HierarchicalFold::createSymmetry(std::vector<std::shared_ptr<SuperBB>> iden
                 if (count != transNum)
                     continue;
                 // float transScore = 95 + it.getScore() / 20;
-                float transScore = it.getScore() + it.getScore() / 5;
+                // float transScore = it.getScore() + it.getScore() / 5;
+
+                // float transScore = std::min(it.getScore() + identBBs.size() * it.getScore() / 10, 95.0f) + it.getScore() / 20;
+                float transScore = std::min(it.getScore() + it.getScore() / 5, 95.0f) + it.getScore() / 20;
+
+
 
                 FoldStep step(symSBB->bbs_[i - 1]->getID(), identBBs[i]->bbs_[0]->getID(), transScore);
                 std::cout << "adding trans " << it.transformation() << " **** " << it.getScore() << std::endl;
@@ -315,10 +320,76 @@ void HierarchicalFold::createSymmetry(std::vector<std::shared_ptr<SuperBB>> iden
     std::cout << "Created " << addedSymCount << " Symmetrical for " << groupIdentifier << std::endl;
 }
 
+std::shared_ptr<SuperBB> HierarchicalFold::getMatchingSBB(SuperBB sbb1, SuperBB sbb2,
+                                                          std::vector<std::vector<unsigned int>> &identGroups) {
+    std::map<unsigned int, unsigned int> bbIdToNewId;
+    for (std::vector<unsigned int> identGroup : identGroups) {
+        // verify sbb1 is fine (mostly for the initial structures)
+        bool flag = false;
+        int maxIdInSbb1 = -1;
+        for (unsigned int i = 0; i < identGroup.size(); i++) {
+            if (((1 << identGroup[i]) & sbb1.bitIds()) == 0) // ident_group[i] not in currResSet
+                flag = true;
+            else if (flag) {
+                if (sbb1.bbs_.size() != 1)
+                    std::cout << "sbb1 not valid " << sbb1.bitIds() << ":" << sbb2.bitIds() << std::endl;
+                return NULL;
+            } else {
+                maxIdInSbb1 = i;
+            }
+        }
+
+        // compute mapping from sbb2 bb ids to new bb ids
+        int maxIdInSbb2 = -1;
+        flag = false;
+        for (unsigned int i = 0; i < identGroup.size(); i++) {
+            if (((1 << identGroup[i]) & sbb2.bitIds()) == 0) // ident_group[i] not in currResSet
+                flag = true;
+            else if (flag) {
+                if (sbb2.bbs_.size() != 1)
+                    std::cout << "sbb2 not valid " << sbb1.bitIds() << ":" << sbb2.bitIds() << std::endl;
+                return NULL;
+            } else {
+                maxIdInSbb2 = i;
+            }
+        }
+
+        if (maxIdInSbb1 == -1 || maxIdInSbb2 == -1)
+            continue;
+
+        if ((maxIdInSbb1 + 1) + (maxIdInSbb2 + 1) > identGroup.size()) {
+            // std::cout << "too big not valid " << sbb1.bitIds() << ":" << sbb2.bitIds() << std::endl;
+            return NULL;
+        }
+
+        for (unsigned int i = 0; i < maxIdInSbb2 + 1; i++) {
+            bbIdToNewId[identGroup[i]] = identGroup[i + maxIdInSbb1 + 1];
+        }
+    }
+
+    // create new SuperBB with new ids
+    if (bbIdToNewId.size() == 0)
+        return std::make_shared<SuperBB>(sbb2);
+
+    // std::cout << "converting " << sbb1.bitIds() << ":" << sbb2.bitIds() << " with " << bbIdToNewId.size() <<
+    // std::endl;
+    std::shared_ptr<SuperBB> newSbb = std::make_shared<SuperBB>(sbb2);
+
+    for (auto iter = bbIdToNewId.rbegin(); iter != bbIdToNewId.rend(); ++iter) {
+        unsigned int oldId = iter->first;
+        unsigned int newId = iter->second;
+        // std::shared_ptr<const BB> newBB = newBBAsSbb->bbs_[0];
+        newSbb->replaceIdentBB(1 << oldId, (*(clusteredSBBS_[1 << newId].begin()))->bbs_[0]);
+    }
+    // std::cout << "converted " << sbb2.bitIds() << "->" << newSbb->bitIds() << std::endl;
+
+    return newSbb;
+}
+
 void HierarchicalFold::fold(const std::string &outFileNamePrefix) {
-    const size_t nthreads = get_available_concurrency();
-    std::cout << "parallel (" << nthreads << " threads):" << std::endl;
-    ctpl::thread_pool threadPool(nthreads);
+    // const size_t nthreads = get_available_concurrency();
+    // std::cout << "parallel (" << nthreads << " threads):" << std::endl;
+    // ctpl::thread_pool threadPool(nthreads);
     bool output = false; // did we find something for N or N-1 subunits
     std::string outFileName = outFileNamePrefix + ".res";
     std::ofstream outFile(outFileName);
@@ -387,15 +458,22 @@ void HierarchicalFold::fold(const std::string &outFileNamePrefix) {
             if ((identGroup.size() % groupDivider) != 0)
                 continue;
             unsigned int groupSize = identGroup.size() / groupDivider;
-            for (unsigned int i = 0; i < groupDivider; i++) {
-                std::vector<std::shared_ptr<SuperBB>> groupSBBs;
-                for (unsigned int j = 0; j < groupSize; j++) {
-                    groupSBBs.push_back(*(clusteredSBBS_[1 << identGroup[i * groupSize + j]].begin()));
-                }
-                std::cout << "searching for size " << groupSBBs.size() << " has "
-                          << precomputedResults.count(groupSBBs.size()) << std::endl;
-                createSymmetry(groupSBBs, *precomputedResults[groupSBBs.size()]);
+            // for (unsigned int i = 0; i < groupDivider; i++) {
+            //     std::vector<std::shared_ptr<SuperBB>> groupSBBs;
+            //     for (unsigned int j = 0; j < groupSize; j++) {
+            //         groupSBBs.push_back(*(clusteredSBBS_[1 << identGroup[i * groupSize + j]].begin()));
+            //     }
+            //     std::cout << "searching for size " << groupSBBs.size() << " has "
+            //               << precomputedResults.count(groupSBBs.size()) << std::endl;
+            //     createSymmetry(groupSBBs, *precomputedResults[groupSBBs.size()]);
+            // }
+            std::vector<std::shared_ptr<SuperBB>> groupSBBs;
+            for (unsigned int j = 0; j < groupSize; j++) {
+                groupSBBs.push_back(*(clusteredSBBS_[1 << identGroup[j]].begin()));
             }
+            std::cout << "searching for size " << groupSBBs.size() << " has "
+                      << precomputedResults.count(groupSBBs.size()) << std::endl;
+            createSymmetry(groupSBBs, *precomputedResults[groupSBBs.size()]);
         }
     }
 
@@ -417,30 +495,42 @@ void HierarchicalFold::fold(const std::string &outFileNamePrefix) {
 
             for (auto it1 = keptResultsByLength[firstResultSize]->begin();
                  it1 != keptResultsByLength[firstResultSize]->end(); it1++) {
-                unsigned long setA = (**it1).bitIds();
+                SuperBB sbb1 = **it1;
+                unsigned long setA = sbb1.bitIds();
+
                 for (auto it2 = keptResultsByLength[secondResultSize]->begin();
                      it2 != keptResultsByLength[secondResultSize]->end(); it2++) {
-                    unsigned long setB = (**it2).bitIds();
-                    if ((setA & setB) != 0)
-                        continue;
-                    if (firstResultSize == secondResultSize && setA < setB)
+
+                    if (firstResultSize == secondResultSize &&
+                        std::distance(keptResultsByLength[firstResultSize]->begin(), it1) >
+                            std::distance(keptResultsByLength[secondResultSize]->begin(), it2))
                         continue; // Since those are 2 identical loops, don't do things twice
 
-                    unsigned long currResSet = setA | setB;
-
-                    if (!isValidBasedOnIdent(identGroups, currResSet))
+                    std::shared_ptr<SuperBB> sbb2Pointer = getMatchingSBB(sbb1, **it2, identGroups);
+                    if (sbb2Pointer == NULL)
                         continue;
+                    SuperBB sbb2 = *sbb2Pointer;
+
+                    unsigned long setB = sbb2.bitIds();
+                    if ((setA & setB) != 0)
+                        continue;
+                    unsigned long currResSet = setA | setB;
+                    // if ((setA & setB) != 0)
+                    //     continue;
+                    // if (!isValidBasedOnIdent(identGroups, currResSet))
+                    //     continue;
 
                     if (best_k_by_id.count(currResSet) == 0)
                         best_k_by_id[currResSet] = new BestK(K_);
 
                     unsigned int resCountBefore = best_k_by_id[currResSet]->size();
+                    float minScoreBefore = best_k_by_id[currResSet]->minScore();
 
                     std::promise<int> promise1;
-                    this->tryToConnect(1, **it1, **it2, *best_k_by_id[currResSet], (length < N_), promise1,
-                                       identGroups);
+                    this->tryToConnect(1, sbb1, sbb2, *best_k_by_id[currResSet], (length < N_), promise1, identGroups);
 
-                    if (resCountBefore < best_k_by_id[currResSet]->size())
+                    if (resCountBefore < best_k_by_id[currResSet]->size() ||
+                        minScoreBefore != best_k_by_id[currResSet]->minScore())
                         std::cout << "found more for " << currResSet << " based on " << setA << " and " << setB
                                   << " before: " << resCountBefore << " after: " << best_k_by_id[currResSet]->size()
                                   << " scores " << best_k_by_id[currResSet]->minScore() << ":"
@@ -496,16 +586,17 @@ void HierarchicalFold::fold(const std::string &outFileNamePrefix) {
                         break;
                 }
             }
-            // TODO: delete currBestK and dictionary
-            //        delete currBestK;
+            delete currBestK;
         }
 
         keptResultsByLength[length] = new BestK(K_ + bestForSubunitId.size());
         for (auto it1 = newKept->begin(); it1 != newKept->end(); it1++) {
             keptResultsByLength[length]->push(*it1);
         }
+        delete newKept;
         for (const auto &[subunitId, currBestK] : bestForSubunitId) {
             keptResultsByLength[length]->push(*currBestK->rbegin());
+            delete currBestK;
         }
 
 
@@ -539,6 +630,13 @@ void HierarchicalFold::fold(const std::string &outFileNamePrefix) {
 
     if (!output)
         outputSubsets();
+
+    for (const auto &[length, currBestK] : precomputedResults) {
+        delete currBestK;
+    }
+    for (const auto &[length, currBestK] : keptResultsByLength) {
+        delete currBestK;
+    }
 }
 
 void HierarchicalFold::outputSubsets() const {
@@ -624,11 +722,9 @@ void HierarchicalFold::tryToConnect(int id, const SuperBB &sbb1, const SuperBB &
                 //        std::cout << "trans check started... ";
 
                 // check that the score is not lower than the minimum in the current bestK
-                //        int posibleScore = (int) it.getScore() + sbb1.transScore_ + sbb2.transScore_;
-                //        if (posibleScore < results.minScore()){
-                //            // std::cout << "filtered because score too low" << std::endl;
-                //            continue;
-                //        }
+                if((it.getScore() + sbb1.transScore_ + sbb2.transScore_) < results.minScore()){
+                    continue;
+                }
 
                 int bbPen = sbb1.backBonePen_ + sbb2.backBonePen_;
                 float newScore = 0.0;

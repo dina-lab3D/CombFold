@@ -10,14 +10,8 @@
 struct comp {
     bool operator()(const std::shared_ptr<SuperBB> &lhs, const std::shared_ptr<SuperBB> &rhs) const {
 
-        return lhs->weightedTransScore_ < rhs->weightedTransScore_;
-        // return lhs->transScore_ < rhs->transScore_;
-    }
-};
-
-struct compWeightedTrans {
-    bool operator()(const std::shared_ptr<SuperBB> &lhs, const std::shared_ptr<SuperBB> &rhs) const {
-        return lhs->weightedTransScore_ < rhs->weightedTransScore_;
+        // return lhs->weightedTransScore_ < rhs->weightedTransScore_;
+        return lhs->transScore_ < rhs->transScore_;
     }
 };
 
@@ -51,12 +45,13 @@ class BestK : public std::multiset<std::shared_ptr<SuperBB>, comp> {
         curMinScore = other.curMinScore;
         return *this;
     }
+    
+    // Note: if you change this also needs to change in HierarchicalFold::tryToConnect
+    float score(const std::shared_ptr<SuperBB> &sbb) const { return sbb->transScore_; }
+    // float score(const std::shared_ptr<SuperBB> &sbb) const { return sbb->weightedTransScore_; }
 
-    //    int score(const std::shared_ptr<SuperBB> &sbb) const { return sbb->transScore_; }
-    float score(const std::shared_ptr<SuperBB> &sbb) const { return sbb->weightedTransScore_; }
-
-    int minScore() const { return curMinScore; }
-    int maxScore() const { 
+    float minScore() const { return curMinScore; }
+    float maxScore() const { 
         if (size() == 0)
             return 0;
         return score(*rbegin()); 
@@ -148,7 +143,7 @@ class BestK : public std::multiset<std::shared_ptr<SuperBB>, comp> {
     virtual ~BestK() {}
 
   private:
-    int internalMinScore() {
+    float internalMinScore() {
         if (size() < k_)
             return -1;
         return score(*begin());
@@ -161,7 +156,7 @@ class BestK : public std::multiset<std::shared_ptr<SuperBB>, comp> {
     std::mutex _mu;
     unsigned int k_;
     bool toDel_;
-    int curMinScore;
+    float curMinScore;
 };
 
 #endif /* BESTK_H */

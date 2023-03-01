@@ -158,6 +158,34 @@ void SuperBB::join(const RigidTrans3 &trans, const SuperBB &other, unsigned int 
     weightedTransScore_ = getWeightedTransScore(foldSteps_, bbs_);
 }
 
+void SuperBB::replaceIdentBB(unsigned long oldBBBitId, std::shared_ptr<const BB> bb) {
+    if((bb->bitId() & bitIDS_) != 0)
+        throw std::runtime_error("Tried to replace BB with BB that already exists in SuperBB");
+
+    std::shared_ptr<const BB> oldBB;
+    unsigned int bbIndex = -1;
+    for (unsigned int i = 0; i < size_; i++) {
+        if (bbs_[i]->bitId() == oldBBBitId) {
+            oldBB = bbs_[i];
+            bbIndex = i;
+            break;
+        }
+    }
+    if(bbIndex == -1)
+        throw std::runtime_error("SuperBB::replaceIdentBB: oldBBBitId not found in SuperBB");
+
+    bbs_[bbIndex] = bb;
+    bitIDS_ -= oldBB->bitId();
+    bitIDS_ += bb->bitId();
+
+    for(FoldStep &step : foldSteps_) {
+        if(step.i_ == oldBB->getID())
+            step.i_ = bb->getID();
+        if(step.j_ == oldBB->getID())
+            step.j_ = bb->getID();
+    }
+}
+
 bool SuperBB::isPenetrating(const RigidTrans3 &trans, const SuperBB &other, float threshold) const {
     for (unsigned int i = 0; i < size_; i++) {
         RigidTrans3 t = (!trans_[i]) * trans;

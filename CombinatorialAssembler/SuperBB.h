@@ -53,6 +53,8 @@ class SuperBB {
     unsigned int size1() const { return size1_; }
     unsigned int size2() const { return size2_; }
 
+    void replaceIdentBB(unsigned long oldBBBitId, std::shared_ptr<const BB> bb);
+
     void setSize(unsigned int s) { size_ = s; }
     void setRestraintsRatio(float r) { restraintsRatio_ = r; }
 
@@ -81,7 +83,7 @@ class SuperBB {
     float maxPen_;
     int numOfBuried_;
     int numOfHydBuried_;
-    int transScore_;
+    float transScore_;
     float weightedTransScore_;
     int numOfXX_;
     int multPen_;

@@ -41,6 +41,9 @@ class HierarchicalFold {
 
     void fold(const std::string &outFileNamePrefix);
 
+    std::shared_ptr<SuperBB> getMatchingSBB(SuperBB sbb1, SuperBB sbb2,
+                                            std::vector<std::vector<unsigned int>> &identGroups);
+
     // 2^N
     static unsigned long numberOfSubsets(unsigned int N) {
         unsigned long ret = 1;
