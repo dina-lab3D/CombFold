@@ -386,6 +386,37 @@ std::shared_ptr<SuperBB> HierarchicalFold::getMatchingSBB(SuperBB sbb1, SuperBB 
     return newSbb;
 }
 
+bool isValidBasedOnAssembly(std::vector<std::vector<unsigned int>> &assemblyGroups, unsigned long currResSet) {
+    if (assemblyGroups.size() <= 1)
+        return true;
+    
+    bool seenPartialGroup = false;
+    int numberOfGroups = 0;
+
+    for (std::vector<unsigned int> assemblyGroup : assemblyGroups) {
+        bool seenZero = false;
+        bool seenOne = false;
+
+        for (unsigned int i = 0; i < assemblyGroup.size(); i++) {
+            if (((1 << assemblyGroup[i]) & currResSet) != 0)
+                seenOne = true;
+            else
+                seenZero = true;
+        }
+
+        if (seenOne)
+            numberOfGroups++;
+
+        if (seenZero && seenOne) {
+            seenPartialGroup = true;
+        }
+    }
+    if (numberOfGroups > 1 && seenPartialGroup)
+        return false;
+
+    return true;
+}
+
 void HierarchicalFold::fold(const std::string &outFileNamePrefix) {
     // const size_t nthreads = get_available_concurrency();
     // std::cout << "parallel (" << nthreads << " threads):" << std::endl;
@@ -415,17 +446,25 @@ void HierarchicalFold::fold(const std::string &outFileNamePrefix) {
     // create ident chains
     std::vector<bool> addedToGroup(N_, false);
     std::vector<std::vector<unsigned int>> identGroups;
+    std::map<unsigned int, std::vector<unsigned int>> assemblyGroupsMap;
     for (unsigned int i = 0; i < N_; i++) {
+        std::shared_ptr<SuperBB> sbbI = *(clusteredSBBS_[1 << i].begin());
+        const std::shared_ptr<const BB> bbI = sbbI->bbs_[0];
+        if(assemblyGroupsMap.count(bbI->groupId()) == 0) {
+            std::vector<unsigned int> newGroup;
+            assemblyGroupsMap[bbI->groupId()] = newGroup;
+        }
+        assemblyGroupsMap[bbI->groupId()].push_back(i);
+
         if (addedToGroup[i])
             continue;
         addedToGroup[i] = true;
         std::vector<unsigned int> identical;
-        std::shared_ptr<SuperBB> sbbI = *(clusteredSBBS_[1 << i].begin());
+        
         for (unsigned int j = i + 1; j < N_; j++) {
             std::cout << "checking ident " << i << " & " << j << std::endl;
             std::shared_ptr<SuperBB> sbbJ = *(clusteredSBBS_[1 << j].begin());
 
-            const std::shared_ptr<const BB> bbI = sbbI->bbs_[0];
             const std::shared_ptr<const BB> bbJ = sbbJ->bbs_[0];
 
             if (bbI->isIdent(*bbJ)) {
@@ -446,6 +485,17 @@ void HierarchicalFold::fold(const std::string &outFileNamePrefix) {
             std::cout << i << " ";
         }
         std::cout << std::endl;
+    }
+
+    std::cout << "---- assembly groups " << std::endl;
+    std::vector<std::vector<unsigned int>> assemblyGroups;
+    for (const auto &[groupId, groupBBIds] : assemblyGroupsMap) {
+        std::cout << "assembly group " << groupId << ":";
+        for (unsigned int i : groupBBIds) {
+            std::cout << i << " ";
+        }
+        std::cout << std::endl;
+        assemblyGroups.push_back(groupBBIds);
     }
 
     // populate with homomers subunits
@@ -515,6 +565,11 @@ void HierarchicalFold::fold(const std::string &outFileNamePrefix) {
                     if ((setA & setB) != 0)
                         continue;
                     unsigned long currResSet = setA | setB;
+                    if(!isValidBasedOnAssembly(assemblyGroups, currResSet)){
+                        std::cout << "invalid assembly " << currResSet << std::endl;
+                        continue;
+                    }
+
                     // if ((setA & setB) != 0)
                     //     continue;
                     // if (!isValidBasedOnIdent(identGroups, currResSet))

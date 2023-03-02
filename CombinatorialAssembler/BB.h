@@ -53,7 +53,8 @@ class BB {
 
     // access
     int getID() const { return id_; }
-    unsigned int bitId() const { return 1 << id_; }
+    unsigned long bitId() const { return 1 << id_; }
+    int groupId() const { return groupId_; }
 
     std::string getPDBFileName() const { return pdbFileName_; }
 
