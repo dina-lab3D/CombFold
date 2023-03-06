@@ -109,6 +109,14 @@ BB::BB(int id, const std::string pdbFileName, int groupID, int groupSize, const 
         resIndexToCAAtom[it->residueIndex()] = *it;
     }
 
+    maxRadius_ = 0.0;
+    for (Molecule<Atom>::const_iterator it = caAtoms_.begin(); it != caAtoms_.end(); it++) {
+        float r = (it->position() - cm_).norm();
+        if (r > maxRadius_)
+            maxRadius_ = r;
+    }
+    std::cout << "Max radius: " << maxRadius_ << std::endl;
+
     std::cout << " done reading BB " << pdbFileName_.c_str() << std::endl;
 }
 

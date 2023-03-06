@@ -61,6 +61,7 @@ class BB {
     unsigned int getSurfaceSize() const { return surface_.size(); }
     unsigned int getNumOfAtoms() const { return numOfAtoms_; }
     const Vector3 &getCM() const { return cm_; }
+    const float getRadius() const { return maxRadius_; }
     const ChemAtom &getChemAtom(int atomIndex) const { return allAtoms_.getChemAtom(atomIndex); }
     const ChemAtom &getChemAtomByIndex(int atomIndex) const { return allAtoms_[atomIndex]; }
 
@@ -131,6 +132,7 @@ class BB {
     int numOfAtoms_;
 
     Vector3 cm_;
+    float maxRadius_;
 
     // chain id and residue numbers for each chain fragment in BB
     typedef std::pair<int, int> ResidueRange;

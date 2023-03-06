@@ -19,7 +19,7 @@ class HierarchicalFold {
     // N - number of subunits, k - best solutions to save at each step
     HierarchicalFold(const std::vector<std::shared_ptr<const BB>> &bbs, unsigned int k, unsigned int maxResultPerResSet,
                      float minTemperatureToConsiderCollision, float maxBackboneCollisionPercentPerChain)
-        : N_(bbs.size()), K_(k), maxResultPerResSet(maxResultPerResSet),
+        : countFilterTras_(0), countFilterTrasSkipped_(0), N_(bbs.size()), K_(k), maxResultPerResSet(maxResultPerResSet),
           minTemperatureToConsiderCollision(minTemperatureToConsiderCollision),
           maxBackboneCollisionPercentPerChain(maxBackboneCollisionPercentPerChain), finalSizeLimit_(k * N_),
           clusteredSBBS_(k), complexConst_(bbs) {
@@ -107,6 +107,10 @@ class HierarchicalFold {
     // members
     static Timer timer_, timerAll_;
     static unsigned int countResults_;
+
+
+    mutable unsigned int countFilterTras_;
+    mutable unsigned int countFilterTrasSkipped_;
 
   private:
     const unsigned int N_;                 // number of subunits

@@ -204,7 +204,8 @@ void HierarchicalFold::createSymmetry(std::vector<std::shared_ptr<SuperBB>> iden
                 // float transScore = it.getScore() + it.getScore() / 5;
 
                 // float transScore = std::min(it.getScore() + identBBs.size() * it.getScore() / 10, 95.0f) + it.getScore() / 20;
-                float transScore = std::min(it.getScore() + it.getScore() / 5, 95.0f) + it.getScore() / 20;
+                float transScore = it.getScore() + it.getScore() * ((100 - it.getScore()) / 100);
+                // float transScore = std::min(it.getScore() + it.getScore(), 95.0f) + it.getScore() / 20;
 
 
 
@@ -542,6 +543,7 @@ void HierarchicalFold::fold(const std::string &outFileNamePrefix) {
         for (unsigned int firstResultSize = 1; firstResultSize <= length / 2; firstResultSize++) {
             unsigned int secondResultSize = length - firstResultSize;
             std::cout << "** running sub-iteration " << firstResultSize << " " << secondResultSize << std::endl;
+            std::cout << "counters " << countFilterTrasSkipped_ << "/" << countFilterTras_ << std::endl;
 
             for (auto it1 = keptResultsByLength[firstResultSize]->begin();
                  it1 != keptResultsByLength[firstResultSize]->end(); it1++) {
@@ -820,7 +822,7 @@ std::shared_ptr<SuperBB> HierarchicalFold::createJoined(const SuperBB &sbb1, con
 bool HierarchicalFold::filterTrans(const SuperBB &sbb1, const SuperBB &sbb2, const RigidTrans3 &trans,
                                    float penThreshold, int &bbPenetrations, int maxBBPenetrations, float &newScore,
                                    unsigned int sbb1Index, unsigned int sbb2Index) const {
-
+    
     // check distance constraints & restraints
     for (unsigned int i = 0; i < sbb1.size_; i++) {
         const BB &bb1 = *sbb1.bbs_[i];
@@ -852,6 +854,20 @@ bool HierarchicalFold::filterTrans(const SuperBB &sbb1, const SuperBB &sbb2, con
                 t2 = !t2;
             }
 
+            countFilterTras_ = countFilterTras_ + 1;
+            
+            //bool should_skip = false;
+            // check if radiuses are too far apart
+            if ((pBB1->getRadius() + pBB2->getRadius()) < (pBB1->getCM() - t2*pBB2->getCM()).norm()) {
+                countFilterTrasSkipped_ = countFilterTrasSkipped_ + 1;
+
+                // std::cout << "skipping because radiuses far " << sbb1.bitIds() << "(" << i << ") " << sbb2.bitIds() 
+                // << "(" << j << ") " << (t*pBB1->getCM() - t2*pBB2->getCM()).norm() << std::endl;
+                continue;
+                // should_skip = true;
+            }
+
+
             unsigned int bbPenetrationsBefore = bbPenetrations;
 
             unsigned int totalUsedAtoms = 0;
@@ -870,6 +886,10 @@ bool HierarchicalFold::filterTrans(const SuperBB &sbb1, const SuperBB &sbb2, con
                         int resEntry = pBB1->grid_->getResidueEntry(v) * -1;
                         if (pBB1->getAtomByResId(resEntry).getTempFactor() < minTemperatureToConsiderCollision)
                             continue;
+                        // if(shold_skip)
+                        //     std::cout << "bad collision " << sbb1.bitIds() << "(" << i << ") " << sbb2.bitIds() 
+                        //     << "(" << j << ") " << (t*pBB1->getCM() - t2*pBB2->getCM()).norm() << std::endl;
+
                         bbPenetrations++;
                         //                      if (bbPenetrations > maxBBPenetrations) {
                         //                          // std::cout << " bbPenetrations " << bbPenetrations << " " <<
@@ -879,8 +899,6 @@ bool HierarchicalFold::filterTrans(const SuperBB &sbb1, const SuperBB &sbb2, con
                 }
             }
 
-            // TODO: should this threshold be configurable
-            // float bbPenChangePercent = (float)(bbPenetrations - bbPenetrationsBefore) / (float)pBB2->caAtoms_.size();
             float bbPenChangePercent = (float)(bbPenetrations - bbPenetrationsBefore) / (float)totalUsedAtoms;
             if (bbPenChangePercent > maxBackboneCollisionPercentPerChain) {
                 return true;
