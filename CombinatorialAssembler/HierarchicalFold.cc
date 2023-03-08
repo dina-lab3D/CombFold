@@ -398,7 +398,7 @@ bool isValidBasedOnAssembly(std::vector<std::vector<unsigned int>> &assemblyGrou
         bool seenZero = false;
         bool seenOne = false;
 
-        for (unsigned int i = 0; i < assemblyGroup.size(); i++) {
+        for (unsigned long i = 0; i < assemblyGroup.size(); i++) {
             if (((1 << assemblyGroup[i]) & currResSet) != 0)
                 seenOne = true;
             else
@@ -802,8 +802,8 @@ void HierarchicalFold::tryToConnect(int id, const SuperBB &sbb1, const SuperBB &
                     continue;
                 }
 
-                results.push(theNew);
-                // results.push_cluster(theNew, 1, identGroups);
+                // results.push(theNew);
+                results.push_cluster(theNew, 1, identGroups);
             }
         }
     }
