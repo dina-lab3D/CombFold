@@ -268,6 +268,10 @@ bool BB::isIdent(const BB &otherBB) const {
             return false;
         }
     }
+    if (groupId_ != otherBB.groupId_) {
+        std::cout << "different group id" << std::endl;
+        return false;
+    }
     std::cout << "checking transforms" << std::endl;
     if (trans_.size() != otherBB.trans_.size())
         return false;
