@@ -606,14 +606,14 @@ void HierarchicalFold::fold(const std::string &outFileNamePrefix) {
                     clusteredBestK->setK(finalSizeLimit_);
                     for (auto it = currBestK->rbegin(); it != currBestK->rend(); it++) {
                         (*it)->calcFinalScore();
-                        (*it)->setRestraintsRatio(complexConst_.getRatio((*it)->bbs_, (*it)->trans_));
+                        (*it)->setRestraintsRatio(complexConst_.getRestraintsRatio((*it)->bbs_, (*it)->trans_));
                         (*it)->fullReport(outFile);
                     }
                     // output after clustering
                     currBestK->cluster(*clusteredBestK, 5.0, identGroups);
                     for (auto it = clusteredBestK->rbegin(); it != clusteredBestK->rend(); it++) {
                         (*it)->calcFinalScore();
-                        (*it)->setRestraintsRatio(complexConst_.getRatio((*it)->bbs_, (*it)->trans_));
+                        (*it)->setRestraintsRatio(complexConst_.getRestraintsRatio((*it)->bbs_, (*it)->trans_));
                         (*it)->fullReport(outFileClustered);
                     }
                 } else {
@@ -714,7 +714,7 @@ void HierarchicalFold::outputSubsets() const {
                 std::ofstream oFile(outFileName);
                 for (auto it = clusteredSBBS_[currResSet].rbegin(); it != clusteredSBBS_[currResSet].rend(); it++) {
                     (*it)->calcFinalScore();
-                    (*it)->setRestraintsRatio(complexConst_.getRatio((*it)->bbs_, (*it)->trans_));
+                    (*it)->setRestraintsRatio(complexConst_.getRestraintsRatio((*it)->bbs_, (*it)->trans_));
                     (*it)->fullReport(oFile);
                 }
                 oFile.close();
@@ -796,9 +796,9 @@ void HierarchicalFold::tryToConnect(int id, const SuperBB &sbb1, const SuperBB &
                 std::shared_ptr<SuperBB> theNew =
                     createJoined(sbb1, sbb2, it.transformation(), numBurried, bbPen, newScore, step, it.getScore());
 
-                if (theNew->getRestraintsRatio() < complexConst_.getDistanceRestraintsRatio()) {
+                if (theNew->getRestraintsRatio() < complexConst_.getDistanceRestraintsRatioThreshold()) {
                     //            std::cout << "not enough restraints " << theNew->getRestraintsRatio() << " : " <<
-                    //            complexConst_.getDistanceRestraintsRatio();
+                    //            complexConst_.getDistanceRestraintsRatioThreshold();
                     continue;
                 }
 
@@ -815,7 +815,7 @@ std::shared_ptr<SuperBB> HierarchicalFold::createJoined(const SuperBB &sbb1, con
                                                         int transScore) const { // first esume i < j
     std::shared_ptr<SuperBB> theNew = std::make_shared<SuperBB>(sbb1);
     theNew->join(trans, sbb2, numBurried, bbPen, newScore, step, transScore);
-    theNew->setRestraintsRatio(complexConst_.getRatio(theNew->bbs_, theNew->trans_));
+    theNew->setRestraintsRatio(complexConst_.getRestraintsRatio(theNew->bbs_, theNew->trans_));
     return theNew;
 }
 
@@ -831,7 +831,7 @@ bool HierarchicalFold::filterTrans(const SuperBB &sbb1, const SuperBB &sbb2, con
             const BB &bb2 = *sbb2.bbs_[j];
             RigidTrans3 t2 = t * sbb2.trans_[j];
             // check constraints first
-            if (!complexConst_.isSatisfied(bb1.getID(), bb2.getID(), t2))
+            if (!complexConst_.areConstraintsSatisfied(bb1.getID(), bb2.getID(), t2))
                 return true;
             // check restraints
             //      if (!complexConst_.isRatioSatisfied(bb1.getID(), bb2.getID(), t2)) return true;

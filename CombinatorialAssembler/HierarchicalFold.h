@@ -55,7 +55,7 @@ class HierarchicalFold {
     void readConstraints(const std::string fileName, float distanceRestraintsRatio) {
         complexConst_.readRestraintsFile(fileName);
         complexConst_.addChainConnectivityConstraints();
-        complexConst_.setDistanceRestraintsRatio(distanceRestraintsRatio);
+        complexConst_.setDistanceRestraintsRatioThreshold(distanceRestraintsRatio);
     }
 
     // add a single BB
