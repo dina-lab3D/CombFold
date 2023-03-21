@@ -1,14 +1,9 @@
 #include "SuperBB.h"
-
 #include "HierarchicalFold.h"
 
-unsigned int SuperBB::counters_[100][100] = {0};
-// unsigned int SuperBB::failsCounter_ = 0;
-// unsigned int SuperBB::failsCounters_[20][20] = {0};
 
 SuperBB::SuperBB(std::shared_ptr<const BB> bb, unsigned int numberOfBBs)
-    : numberOfBBs_(numberOfBBs), backBonePen_(0), newScore_(0.0), transScore_(0), weightedTransScore_(100),
-      contact_(numberOfBBs * numberOfBBs, false), rmsd_(0.0), yetAnother_(0) {
+    : numberOfBBs_(numberOfBBs), backBonePen_(0), transScore_(0), weightedTransScore_(100) {
 
     id_ = bb->id_;
     bbs_.push_back(bb);
@@ -19,54 +14,7 @@ SuperBB::SuperBB(std::shared_ptr<const BB> bb, unsigned int numberOfBBs)
     size_ = 1;
     bitIDS_ = bb->bitId();
     numOfAtoms_ = bb->numOfAtoms_;
-    sps_ = bb->ipSet_.size();
 }
-
-float SuperBB::compactness(int numOfAtoms, int sps) {
-    float f_numOfAtoms = numOfAtoms * 3.0 / 100.0;
-    float f_sps = ((float)sps) / 1000.0;
-    // cerr << " numOfAtoms " << numOfAtoms << " sps " << sps << endl;
-    // cerr << " numOfAtoms " << f_numOfAtoms << " sps " << f_sps << endl;
-    return (f_numOfAtoms * f_numOfAtoms) / (f_sps * f_sps * f_sps);
-}
-
-void SuperBB::join(const RigidTrans3 &trans, const SuperBB &other, unsigned int burriedSps) {
-    // now joining is simple
-    for (unsigned int j = 0; j < other.size_; j++) {
-        bbs_.push_back(other.bbs_[j]);
-        trans_.push_back(trans * other.trans_[j]);
-    }
-    size_ += other.size_;
-    child1_ = bitIDS_;
-    child2_ = other.bitIDS_;
-    bitIDS_ |= other.bitIDS_;
-    id_ = std::min(other.id_, id_);
-    sps_ += other.sps_ - burriedSps;
-    numOfAtoms_ += other.numOfAtoms_;
-    counters_[size_][id_]++;
-}
-
-/*
-void SuperBB::reportCounters() {
-  int total = 0;
-  int totalFails = 0;
-  for (unsigned int size = 2; size <= numberOfBBs_; size++) {
-    int level = 0;
-    int failLevel = 0;
-    for (unsigned int id = 0; id <= numberOfBBs_ - size; id++) {
-      std::cerr << " counters_["<<size<<"]["<<id<<"] = " << counters_[size][id];
-      std::cerr << " failsCounters_["<<size<<"]["<<id<<"] = " << failsCounters_[size][id];
-      level += counters_[size][id];
-      failLevel += failsCounters_[size][id];
-    }
-    std::cerr << " total of size " << size << " is: " << level << " fails " << failLevel << std::endl;
-    total += level;
-    totalFails += failLevel;
-  }
-  std::cerr << " total " << total << std::endl;
-  std::cerr << " totalFails " << totalFails << std::endl;
-}
-*/
 
 float getWeightedTransScore(std::vector<FoldStep> steps, std::vector<std::shared_ptr<const BB>> bbs) {
     unsigned int totalCa = 0;
@@ -126,8 +74,7 @@ float getWeightedTransScore(std::vector<FoldStep> steps, std::vector<std::shared
     return totalScore / totalCa;
 }
 
-void SuperBB::join(const RigidTrans3 &trans, const SuperBB &other, unsigned int burriedSps, int bbPen, float newScore,
-                   FoldStep &step, float transScore) {
+void SuperBB::join(const RigidTrans3 &trans, const SuperBB &other, int bbPen, FoldStep &step, float transScore) {
     // now joining is simple
     for (unsigned int j = 0; j < other.size_; j++) {
         bbs_.push_back(other.bbs_[j]);
@@ -140,9 +87,7 @@ void SuperBB::join(const RigidTrans3 &trans, const SuperBB &other, unsigned int 
     child2_ = other.bitIDS_;
     bitIDS_ |= other.bitIDS_;
     id_ = std::min(other.id_, id_);
-    sps_ += other.sps_ - burriedSps;
     backBonePen_ = bbPen;
-    newScore_ += other.newScore_ + newScore;
 
     int totalAtomNum = numOfAtoms_ + other.numOfAtoms_;
 
@@ -153,7 +98,6 @@ void SuperBB::join(const RigidTrans3 &trans, const SuperBB &other, unsigned int 
         foldSteps_.insert(foldSteps_.end(), other.foldSteps_.begin(), other.foldSteps_.end());
     }
     foldSteps_.push_back(step);
-    counters_[size_][id_]++;
 
     weightedTransScore_ = getWeightedTransScore(foldSteps_, bbs_);
 }
@@ -197,42 +141,9 @@ bool SuperBB::isPenetrating(const RigidTrans3 &trans, const SuperBB &other, floa
     return false;
 }
 
-float SuperBB::calcCompact() {
-    int sps = 0;
-    int numOfAtoms = 0;
-    for (unsigned int i = 0; i < size_; i++) {
-        numOfAtoms += bbs_[i]->numOfAtoms_;
-        for (Surface::const_iterator it = bbs_[i]->surface_.begin(); it != bbs_[i]->surface_.end(); it++) {
-            Vector3 p = trans_[i] * (it->position() + (it->normal() * 1.8));
-            bool isSP = true;
-            for (unsigned int j = 0; j < size_; j++) {
-                if (j == i)
-                    continue;
-                float penetration = bbs_[j]->getDistFromSurface((!trans_[j]) * p);
-                if (penetration <= 0) {
-                    isSP = false;
-                    break;
-                }
-            }
-            if (isSP)
-                sps++;
-        }
-    }
-    float f_numOfAtoms = numOfAtoms * 3.0 / 100.0;
-    float f_sps = ((float)sps) / 1000.0;
-    std::cerr << " numOfAtoms " << numOfAtoms << " sps " << sps << std::endl;
-    std::cerr << " numOfAtoms " << f_numOfAtoms << " sps " << f_sps << std::endl;
-
-    return (f_numOfAtoms * f_numOfAtoms) / (f_sps * f_sps * f_sps);
-}
-
 void SuperBB::calcFinalScore() {
     backBonePen_ = 0;
     maxPen_ = 0.0;
-    numOfBuried_ = 0;
-    numOfXX_ = 0;
-    numOfHydBuried_ = 0;
-    newScore_ = 0;
     multPen_ = 0;
     singlePen_ = 0;
     for (unsigned int i = 0; i < size_; i++) {
@@ -241,50 +152,12 @@ void SuperBB::calcFinalScore() {
         for (unsigned int j = 0; j < size_; j++) {
             tr.push_back((!trans_[j]) * trans_[i]);
         }
-        for (unsigned int sp = 0; sp < bb1.ipSet_.size(); sp++) { // loop over ips
-            const InterestPoint &ip = bb1.ipSet_[sp];
-            bool unburried = true;
-            bool xx = false;
-            int countPen = 0;
-
-            for (unsigned int j = 0; j < size_; j++) {
-                if (i == j)
-                    continue;
-                const BB &bb2 = *bbs_[j];
-                float dist = bb2.getDistFromSurface(tr[j] * ip.position_); // check penetration
-                if (dist < maxPen_) {
-                    maxPen_ = dist;
-                }
-                if (dist <= 0)
-                    countPen++;
-                float dist1 = bb2.getDistFromSurface(tr[j] * ip.probePosition_); // check is burried
-                if (dist1 > dist && dist < 0) {
-                    numOfXX_++;
-                    xx = true;
-                }
-                if (unburried && !xx && dist <= 1.0) { // if burried
-                    unburried = false;
-                }
-            }
-            if (!unburried && !xx) {
-                numOfBuried_++;
-                if (ip.hydrophobic_)
-                    numOfHydBuried_++;
-            }
-
-            if (countPen > 1)
-                multPen_++;
-            if (countPen == 1)
-                singlePen_++;
-        }
         // std::cout << " multPen_ " << multPen_ << " singlePen_ " << singlePen_ << std::endl;
         for (unsigned int j = 0; j < size_; j++) {
             if (i == j)
                 continue;
             const BB &bb2 = *bbs_[j];
-            // newScore_ += bb1.dockScore_->score(tr[j], *bb2.grid_);
             bb1.dockScore_->setGrid(bb2.grid_);
-            newScore_ += bb1.dockScore_->score(tr[j]);
             for (Molecule<ChemAtom>::const_iterator it = bb1.backBone_.begin(); it != bb1.backBone_.end(); it++) {
                 Vector3 v = tr[j] * it->position();
                 //                if (bb2.getDistFromSurface(v) < 0) {
@@ -298,51 +171,6 @@ void SuperBB::calcFinalScore() {
             }
         }
     }
-}
-
-// RMSD relative to input position
-double SuperBB::calcRmsd(RigidTrans3 &trans, float &compact2) const {
-    Match match;
-    Molecule<Atom> A, B;
-    int j = 0;
-    Vector3 cm(0, 0, 0);
-    for (unsigned int i = 0; i < size_; i++) {
-        const Molecule<ChemAtom> &backBone = bbs_[i]->backBone_;
-        const RigidTrans3 &tr = trans_[i];
-        for (Molecule<ChemAtom>::const_iterator it = backBone.begin(); it != backBone.end(); it++) {
-            if (it->type()[1] == 'C' && it->type()[2] == 'A') {
-                Vector3 pos(tr * it->position());
-                Atom a(*it); //; SET_ATOM_POS(it->position());
-                Atom b(a);
-                b *= tr;
-                A.add(a);
-                B.add(b);
-                match.add(j, j, 1);
-                j++;
-                cm += pos;
-            }
-        }
-    }
-    cm /= j;
-    // cerr << "cm " << cm<< endl;
-    match.calculateBestFit(A, B);
-    trans = match.rigidTrans();
-
-    float ms = 0;
-    for (unsigned int i = 0; i < size_; i++) {
-        const Molecule<ChemAtom> &backBone = bbs_[i]->backBone_;
-        const RigidTrans3 &tr = trans_[i];
-        for (Molecule<ChemAtom>::const_iterator it = backBone.begin(); it != backBone.end(); it++) {
-            if (it->type()[1] == 'C' && it->type()[2] == 'A') {
-                Vector3 pos(tr * it->position() - cm);
-                float dist2 = pos.norm2();
-                ms += dist2;
-            }
-        }
-    }
-    ms /= j;
-    compact2 = sqrt(ms);
-    return match.rmsd();
 }
 
 // RMSD between two SBBs (assuming same BBs)
@@ -388,8 +216,6 @@ double SuperBB::calcRmsd(const SuperBB &other, std::vector<std::vector<unsigned 
     }
     cmMatch.calculateBestFit(cmA, cmB);
     float foundRMSD = cmMatch.rmsd();
-
-    // std::cout << "trying to cluster " << numOfBuried_ << " " << other.numOfBuried_ << " " << foundRMSD << std::endl;
 
     int MAX_ITER = 10;
     // try replacing chains with each other
@@ -527,21 +353,9 @@ void SuperBB::fullReport(std::ostream &s) {
 
     HierarchicalFold::countResults_++;
     RigidTrans3 tr;
-    float compact2(0);
-    if (yetAnother_ == 0)
-        yetAnother_ = newScore_ * ((float)singlePen_ / (singlePen_ - multPen_));
-    if (rmsd_ == 0)
-        rmsd_ = calcRmsd(tr, compact2);
-    // cerr << " compact2 " << compact2 << endl;
-    s << "size_ " << size_ << " rmsd " << rmsd_ << " numOfBuried_ " << numOfBuried_ << " numOfHydBuried_ "
-      << numOfHydBuried_ << " buried_diff " << ((float)numOfHydBuried_) / (numOfBuried_ - numOfHydBuried_)
-      << " newScore_ " << newScore_ << " yetAnother_ " << yetAnother_ << " transScore_ " << transScore_ << " XX_ "
-      << numOfXX_ << " compact2 " << compact2 << " multPen_ " << multPen_ << " singlePen_ " << singlePen_ << " diffPen "
-      << singlePen_ - multPen_ << " backBonePen_ " << backBonePen_ << " maxPen_ " << maxPen_ << " restraintsRatio_ "
-      << restraintsRatio_ << " weightedTransScore " << weightedTransScore_;
-    s << " contact_ ";
-    for (std::vector<bool>::iterator i = contact_.begin(); i < contact_.end(); ++i)
-        s << (*i ? '1' : '0');
+    s << "size_ " << size_ << " transScore_ " << transScore_ << " multPen_ " << multPen_ << " singlePen_ " 
+      << singlePen_ << " diffPen " << singlePen_ - multPen_ << " backBonePen_ " << backBonePen_ << " maxPen_ " 
+      << maxPen_ << " restraintsRatio_ " << restraintsRatio_ << " weightedTransScore " << weightedTransScore_;
     s << " [";
     int i = 0;
     for (auto it = bbs_.begin(); it != bbs_.end(); it++, i++) {
@@ -558,8 +372,7 @@ void SuperBB::fullReport(std::ostream &s) {
 
 std::ostream &operator<<(std::ostream &s, const SuperBB &sbb) {
     // scores
-    s << "size_ " << sbb.size_ << " newScore_ " << sbb.newScore_ << " backBonePen_ " << sbb.backBonePen_
-      << " restraintsRatio_ " << sbb.restraintsRatio_;
+    s << "size_ " << sbb.size_ << " backBonePen_ " << sbb.backBonePen_ << " restraintsRatio_ " << sbb.restraintsRatio_;
 
     // transformations
     s << " [";
@@ -574,28 +387,6 @@ std::ostream &operator<<(std::ostream &s, const SuperBB &sbb) {
     FoldStep::outputFoldSteps(s, sbb.foldSteps_);
     s << std::endl;
     return s;
-}
-
-void SuperBB::preClustering() {
-    for (unsigned int i = 0; i < size_; i++) {
-        const BB &bb1 = *bbs_[i];
-        std::vector<RigidTrans3> tr;
-        for (unsigned int j = 0; j < size_; j++) {
-            tr.push_back((!trans_[j]) * trans_[i]);
-        }
-        for (unsigned int sp = 0; sp < bb1.ipSet_.size(); sp++) { // loop over ips
-            for (unsigned int j = 0; j < size_; j++) {
-                if (i == j)
-                    continue;
-                const BB &bb2 = *bbs_[j];
-                const InterestPoint &ip = bb1.ipSet_[sp];
-                float dist = bb2.getDistFromSurface(tr[j] * ip.position_); // check penetration
-                if (dist < 1) {
-                    contact_[bb1.id_ * numberOfBBs_ + bb2.id_] = contact_[bb2.id_ * numberOfBBs_ + bb1.id_] = true;
-                }
-            }
-        }
-    }
 }
 
 TransIterator2::TransIterator2(const SuperBB &bb1, const SuperBB &bb2, int pbb1, int pbb2)

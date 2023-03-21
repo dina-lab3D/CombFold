@@ -10,45 +10,6 @@ ScoreParams BB::scoreParams_;
 float BB::gridResolution_(0.0);
 float BB::gridMargins_(0.0);
 
-namespace {
-bool isNonPolr(const char res, const char *atom) {
-    // cout << " isNonPolr " << res << " " << atom << endl;
-    if (atom[1] == 'S')
-        return true;
-    if (atom[1] != 'C')
-        return false;
-    if ((atom[2] == 'A' || atom[2] == 'B') && atom[3] == ' ')
-        return true;
-    if (atom[2] == 'H')
-        return true;
-    if (atom[2] == 'G') {
-        if (res == 'N')
-            return false;
-        return true;
-    }
-    if (atom[2] == 'D') {
-        if (res == 'Q')
-            return false;
-        return true;
-    }
-    if (atom[2] == 'E') {
-        if (res == 'H')
-            return false;
-        return true;
-    }
-    if (atom[2] == 'Z') {
-        if (res == 'R')
-            return false;
-        return true;
-    }
-    if (atom[2] == 'Z') {
-        if (res == 'R')
-            return false;
-        return true;
-    }
-    return false;
-}
-}; // namespace
 
 BB::BB(int id, const std::string pdbFileName, int groupID, int groupSize, const ChemLib &lib)
     : id_(id), groupId_(groupID), groupSize_(groupSize), pdbFileName_(pdbFileName) {
@@ -84,21 +45,10 @@ BB::BB(int id, const std::string pdbFileName, int groupID, int groupSize, const 
     std::cout << "Shuo surface done " << surface_.size() << std::endl;
     */
     std::vector<Atom *> atomsMap;
-    int j = 0;
     atomsMap.push_back(&(*allAtoms_.begin()));
     for (ChemMolecule::iterator i = allAtoms_.begin(); i != allAtoms_.end(); i++) {
         atomsMap.push_back(&(*i));
     }
-    for (Surface::iterator it = surface_.begin(); it != surface_.end(); it++) {
-        bool nonPolar = isNonPolr(atomsMap[it->atomIndex(0)]->residueType(), atomsMap[it->atomIndex(0)]->type());
-        if (nonPolar) {
-            // cerr << " nonPolar " << j << endl;
-            j++;
-        }
-        ipSet_.push_back(InterestPoint(
-            it->position(), it->position() + grid_->calcVolumeNormal(it->position(), 4.0) * PROB_RADIUS, nonPolar));
-    }
-    std::cout << "# nonPolar points" << j << std::endl;
 
     dockScore_ = new GeomScore(msSurface_, scoreParams_.weights, scoreParams_.max_penetration, 0.5);
     dockScore_->buildTree();

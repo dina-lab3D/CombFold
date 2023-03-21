@@ -26,25 +26,17 @@ class SuperBB {
     // This function takes Two super BBs and joins them
     // trans - This is the transformation that joins the two super BBS together
     // other - This is the second BB to be joined to this one
-    void join(const RigidTrans3 &trans, const SuperBB &other, unsigned int burriedSps);
-    void join(const RigidTrans3 &trans, const SuperBB &other, unsigned int burriedSps, int bbPen, float newScore,
-              FoldStep &step, float transScore);
+    void join(const RigidTrans3 &trans, const SuperBB &other, int bbPen, FoldStep &step, float transScore);
     // This function checks for collissions - Receives transformation and a second super BB and decides if
     // they collide
     bool isPenetrating(const RigidTrans3 &trans, const SuperBB &other, float threshold) const;
-    float calcCompact();
-    float compactness() { return compactness(numOfAtoms_, sps_); }
     void calcFinalScore();
-    void preClustering();
-    double calcRmsd(RigidTrans3 &trans, float &compactness2) const;
     double calcRmsd(const SuperBB &other) const;
     double calcRmsd(const SuperBB &other, std::vector<std::vector<unsigned int>> &identGroups) const;
     void fullReport(std::ostream &s);
     const FoldStep &lastFoldStep() const { return foldSteps_[size_ - 2]; }
     bool isInChild1(unsigned int i) const { return (child1_ & (1 << i)); }
     bool isInChild2(unsigned int i) const { return (child2_ & (1 << i)); }
-    static float compactness(int numOfAtoms, int sps);
-    // float SuperBB::compactness();
     int gap(int id);
     float getRestraintsRatio() const { return restraintsRatio_; }
 
@@ -65,7 +57,6 @@ class SuperBB {
     unsigned int size_, size1_, size2_;
     unsigned int id_;
     unsigned int numOfAtoms_;
-    unsigned int sps_;
     std::vector<FoldStep> foldSteps_; // FoldStep is a transformation between two SUs
     unsigned int bitIDS_;
     unsigned int child1_, child2_;
@@ -79,20 +70,11 @@ class SuperBB {
     std::vector<RigidTrans3> trans_;
 
     int backBonePen_;
-    float newScore_;
     float maxPen_;
-    int numOfBuried_;
-    int numOfHydBuried_;
     float transScore_;
     float weightedTransScore_;
-    int numOfXX_;
     int multPen_;
     int singlePen_;
-    std::vector<bool> contact_;
-    float rmsd_;
-    int yetAnother_;
-
-    static unsigned int counters_[100][100];
 };
 
 class TransIterator2 {

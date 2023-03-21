@@ -19,10 +19,10 @@ class HierarchicalFold {
     // N - number of subunits, k - best solutions to save at each step
     HierarchicalFold(const std::vector<std::shared_ptr<const BB>> &bbs, unsigned int k, unsigned int maxResultPerResSet,
                      float minTemperatureToConsiderCollision, float maxBackboneCollisionPercentPerChain)
-        : countFilterTras_(0), countFilterTrasSkipped_(0), N_(bbs.size()), K_(k), maxResultPerResSet(maxResultPerResSet),
-          minTemperatureToConsiderCollision(minTemperatureToConsiderCollision),
+        : countFilterTras_(0), countFilterTrasSkipped_(0), N_(bbs.size()), K_(k),
+          maxResultPerResSet(maxResultPerResSet), minTemperatureToConsiderCollision(minTemperatureToConsiderCollision),
           maxBackboneCollisionPercentPerChain(maxBackboneCollisionPercentPerChain), finalSizeLimit_(k * N_),
-          clusteredSBBS_(k), complexConst_(bbs) {
+          bestKContainer_(k), complexConst_(bbs) {
         unsigned long max = numberOfSubsets(N_); // 2^N
         std::cout << "FinalSizeLimit_ " << finalSizeLimit_ << " max " << max << std::endl;
     }
@@ -32,11 +32,11 @@ class HierarchicalFold {
 
     void createSymmetry(std::vector<std::shared_ptr<SuperBB>> identBBs, BestK &results);
 
-    std::shared_ptr<SuperBB> createJoined(const SuperBB &sbb1, const SuperBB &sbb2, RigidTrans3 &trans, int numBurried,
-                                          int bbPen, float newScore, FoldStep &step, int transScore) const;
+    std::shared_ptr<SuperBB> createJoined(const SuperBB &sbb1, const SuperBB &sbb2, RigidTrans3 &trans, int bbPen,
+                                          FoldStep &step, float transScore) const;
 
     bool filterTrans(const SuperBB &sbb1, const SuperBB &sbb2, const RigidTrans3 &trans, float penThreshold,
-                     int &bbPenetrations, int maxBBPenetrations, float &newScore, unsigned int sbb1Index,
+                     int &bbPenetrations, int maxBBPenetrations, unsigned int sbb1Index,
                      unsigned int sbb2Index) const;
 
     void fold(const std::string &outFileNamePrefix);
@@ -62,7 +62,7 @@ class HierarchicalFold {
     void add(std::shared_ptr<SuperBB> sbb, int index) {
         unsigned long one = 1;
         unsigned long set = one << index;
-        BestK *cb = clusteredSBBS_.newBestK(set);
+        BestK *cb = bestKContainer_.newBestK(set);
         cb->push(sbb);
     }
 
@@ -120,7 +120,7 @@ class HierarchicalFold {
     const float maxBackboneCollisionPercentPerChain;
 
     int finalSizeLimit_;
-    BestKContainer clusteredSBBS_;
+    BestKContainer bestKContainer_;
     ComplexDistanceConstraint complexConst_;
 };
 

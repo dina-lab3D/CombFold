@@ -2,8 +2,9 @@ BOOST_INCLUDE = /opt/homebrew/include
 BOOST_LIB = /opt/homebrew/lib/
 
 CC=g++
+# use -Wno-deprecated-declarations to suppress warnings from boost
 # CFLAGS=-c -Wall -I./libs_gamb -I./libs_DockingLib -I$(BOOST_INCLUDE) -O2 --std=c++11 # -fexpensive-optimizations -ffast-math
-CFLAGS=-c -Wall -I./libs_gamb -I./libs_DockingLib -I$(BOOST_INCLUDE) -g -O2 --std=c++11 # -fexpensive-optimizations -ffast-math
+CFLAGS=-c -Wall -Wno-deprecated-declarations -I./libs_gamb -I./libs_DockingLib -I$(BOOST_INCLUDE) -g -O2 --std=c++17 # -fexpensive-optimizations -ffast-math
 # CFLAGS=-c -Wall -I./libs_gamb -I./libs_DockingLib -I$(BOOST_INCLUDE) -O0 -g --std=c++11 # -fexpensive-optimizations -ffast-math
 
 SOURCES_MAIN = $(wildcard *.cc)
@@ -28,6 +29,9 @@ libgamb.a: $(OBJECTS_GAMB)
 libdocklib.a: $(OBJECTS_DOCKLIB) libgamb.a
 	ar rcs libdocklib.a $(OBJECTS_DOCKLIB) $(OBJECTS_GAMB)
 
-clean:
+clean_all:
 	rm -f *.o *.a CombinatorialAssembler.out libs_gamb/*.o libs_DockingLib/*.o
+
+clean:
+	rm -f *.o CombinatorialAssembler.out
 

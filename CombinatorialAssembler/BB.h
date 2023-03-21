@@ -107,7 +107,6 @@ class BB {
   private:
     // surface points
     // Different methods for computing collision
-    std::vector<InterestPoint> ipSet_; // sparse
     Surface surface_;                  // shuo
     Surface msSurface_;                // connolly - dense
 

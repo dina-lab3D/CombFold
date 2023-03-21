@@ -24,10 +24,10 @@ void HierarchicalFold::checkConnectivity() const {
     for (unsigned int suIndex = 0; suIndex < N_; suIndex++) {
         unsigned long one = 1;
         unsigned long index = one << suIndex;
-        std::cerr << "isEmpty " << suIndex << " " << clusteredSBBS_.isEmpty(index) << std::endl;
-        std::cerr << "SBB " << suIndex << " size " << clusteredSBBS_[index].size() << std::endl;
-        if (clusteredSBBS_[index].size() >= 1) {
-            std::shared_ptr<SuperBB> sbb = *(clusteredSBBS_[index].rbegin());
+        std::cerr << "isEmpty " << suIndex << " " << bestKContainer_.isEmpty(index) << std::endl;
+        std::cerr << "SBB " << suIndex << " size " << bestKContainer_[index].size() << std::endl;
+        if (bestKContainer_[index].size() >= 1) {
+            std::shared_ptr<SuperBB> sbb = *(bestKContainer_[index].rbegin());
             std::shared_ptr<const BB> bb = sbb->bbs_[0];
 
             for (unsigned int suIndex2 = 0; suIndex2 < N_; suIndex2++) {
@@ -58,17 +58,17 @@ void HierarchicalFold::outputConnectivityGraph(std::string outFileName) const {
     for (unsigned int suIndex = 0; suIndex < N_; suIndex++) {
         unsigned long one = 1;
         unsigned long set = one << suIndex;
-        std::cerr << "SBB " << suIndex << " set " << set << " isEmpty " << clusteredSBBS_.isEmpty(set) << std::endl;
-        std::cerr << "SBB " << suIndex << " size " << clusteredSBBS_[set].size() << std::endl;
-        if (clusteredSBBS_[set].size() >= 1) {
-            std::shared_ptr<SuperBB> sbb = *(clusteredSBBS_[set].rbegin());
+        std::cerr << "SBB " << suIndex << " set " << set << " isEmpty " << bestKContainer_.isEmpty(set) << std::endl;
+        std::cerr << "SBB " << suIndex << " size " << bestKContainer_[set].size() << std::endl;
+        if (bestKContainer_[set].size() >= 1) {
+            std::shared_ptr<SuperBB> sbb = *(bestKContainer_[set].rbegin());
             std::shared_ptr<const BB> bb = sbb->bbs_[0];
 
             for (unsigned int suIndex2 = suIndex + 1; suIndex2 < N_; suIndex2++) {
                 unsigned int transSize = bb->getTransformations(suIndex2).size();
                 unsigned long set2 = one << suIndex2;
                 std::cerr << suIndex << " " << suIndex2 << " trans size " << transSize << " " << set2 << std::endl;
-                std::shared_ptr<SuperBB> sbb2 = *(clusteredSBBS_[set2].rbegin());
+                std::shared_ptr<SuperBB> sbb2 = *(bestKContainer_[set2].rbegin());
                 std::shared_ptr<const BB> bb2 = sbb2->bbs_[0];
 
                 if (transSize > 0) {
@@ -212,7 +212,7 @@ void HierarchicalFold::createSymmetry(std::vector<std::shared_ptr<SuperBB>> iden
                 FoldStep step(symSBB->bbs_[i - 1]->getID(), identBBs[i]->bbs_[0]->getID(), transScore);
                 std::cout << "adding trans " << it.transformation() << " **** " << it.getScore() << std::endl;
                 // symSBB = createJoined(*symSBB, *identBBs[i], it.transformation(), 0, 0, 0, step, it.getScore());
-                symSBB = createJoined(*symSBB, *identBBs[i], it.transformation(), 0, 0, 0, step, transScore);
+                symSBB = createJoined(*symSBB, *identBBs[i], it.transformation(), 0, step, transScore);
                 break;
             }
         }
@@ -380,7 +380,7 @@ std::shared_ptr<SuperBB> HierarchicalFold::getMatchingSBB(SuperBB sbb1, SuperBB 
         unsigned int oldId = iter->first;
         unsigned int newId = iter->second;
         // std::shared_ptr<const BB> newBB = newBBAsSbb->bbs_[0];
-        newSbb->replaceIdentBB(1 << oldId, (*(clusteredSBBS_[1 << newId].begin()))->bbs_[0]);
+        newSbb->replaceIdentBB(1 << oldId, (*(bestKContainer_[1 << newId].begin()))->bbs_[0]);
     }
     // std::cout << "converted " << sbb2.bitIds() << "->" << newSbb->bitIds() << std::endl;
 
@@ -432,7 +432,7 @@ void HierarchicalFold::fold(const std::string &outFileNamePrefix) {
 
     //  BestK* keptResults = new BestK(N_);
     for (unsigned int i = 0; i < N_; i++) {
-        BestK &singleChainSBBS = clusteredSBBS_[1 << i];
+        BestK &singleChainSBBS = bestKContainer_[1 << i];
         if (singleChainSBBS.size() != 1) {
             std::cerr << "started with " << singleChainSBBS.size() << " SBBs for " << (1 << i) << std::endl;
         }
@@ -449,7 +449,7 @@ void HierarchicalFold::fold(const std::string &outFileNamePrefix) {
     std::vector<std::vector<unsigned int>> identGroups;
     std::map<unsigned int, std::vector<unsigned int>> assemblyGroupsMap;
     for (unsigned int i = 0; i < N_; i++) {
-        std::shared_ptr<SuperBB> sbbI = *(clusteredSBBS_[1 << i].begin());
+        std::shared_ptr<SuperBB> sbbI = *(bestKContainer_[1 << i].begin());
         const std::shared_ptr<const BB> bbI = sbbI->bbs_[0];
         if(assemblyGroupsMap.count(bbI->groupId()) == 0) {
             std::vector<unsigned int> newGroup;
@@ -464,7 +464,7 @@ void HierarchicalFold::fold(const std::string &outFileNamePrefix) {
         
         for (unsigned int j = i + 1; j < N_; j++) {
             std::cout << "checking ident " << i << " & " << j << std::endl;
-            std::shared_ptr<SuperBB> sbbJ = *(clusteredSBBS_[1 << j].begin());
+            std::shared_ptr<SuperBB> sbbJ = *(bestKContainer_[1 << j].begin());
 
             const std::shared_ptr<const BB> bbJ = sbbJ->bbs_[0];
 
@@ -520,7 +520,7 @@ void HierarchicalFold::fold(const std::string &outFileNamePrefix) {
             // }
             std::vector<std::shared_ptr<SuperBB>> groupSBBs;
             for (unsigned int j = 0; j < groupSize; j++) {
-                groupSBBs.push_back(*(clusteredSBBS_[1 << identGroup[j]].begin()));
+                groupSBBs.push_back(*(bestKContainer_[1 << identGroup[j]].begin()));
             }
             std::cout << "searching for size " << groupSBBs.size() << " has "
                       << precomputedResults.count(groupSBBs.size()) << std::endl;
@@ -599,7 +599,7 @@ void HierarchicalFold::fold(const std::string &outFileNamePrefix) {
         std::map<unsigned long, BestK *> bestForSubunitId;
         for (const auto &[currResSet, currBestK] : best_k_by_id) {
             if (currBestK->size() > 0) {
-                BestK *clusteredBestK = clusteredSBBS_.newBestK(currResSet);
+                BestK *clusteredBestK = bestKContainer_.newBestK(currResSet);
 
                 if (length == N_) { // output before clustering
                     output = true;
@@ -623,8 +623,8 @@ void HierarchicalFold::fold(const std::string &outFileNamePrefix) {
                 }
 
                 std::cerr << "clustering resSet " << currResSet << " before: " << currBestK->size() << " after "
-                          << clusteredSBBS_[currResSet].size() << " scores " << clusteredSBBS_[currResSet].minScore()
-                          << ":" << clusteredSBBS_[currResSet].maxScore() << std::endl;
+                          << bestKContainer_[currResSet].size() << " scores " << bestKContainer_[currResSet].minScore()
+                          << ":" << bestKContainer_[currResSet].maxScore() << std::endl;
 
                 for (unsigned long i = 0; i < N_; i++) {
                     if ((currResSet & (1 << i)) != 0) {
@@ -636,7 +636,7 @@ void HierarchicalFold::fold(const std::string &outFileNamePrefix) {
                 }
 
                 unsigned int count = 0;
-                for (auto it1 = clusteredSBBS_[currResSet].rbegin(); it1 != clusteredSBBS_[currResSet].rend(); it1++) {
+                for (auto it1 = bestKContainer_[currResSet].rbegin(); it1 != bestKContainer_[currResSet].rend(); it1++) {
                     newKept->push(*it1);
                     count += 1;
                     if (count >= maxResultPerResSet)
@@ -707,12 +707,12 @@ void HierarchicalFold::outputSubsets() const {
             unsigned long one = 1;
             unsigned long currResSet = subsetGen.getSubset(one) | subsetGen.getComplementry(one);
 
-            if (!clusteredSBBS_.isEmpty(currResSet)) {
+            if (!bestKContainer_.isEmpty(currResSet)) {
                 found = true;
                 std::string outFileName = "cb_" + std::to_string(length) + "_" + std::to_string(currResSet) + ".res";
                 std::cout << outFileName << " missing " << findMissingSubunits(currResSet) << std::endl;
                 std::ofstream oFile(outFileName);
-                for (auto it = clusteredSBBS_[currResSet].rbegin(); it != clusteredSBBS_[currResSet].rend(); it++) {
+                for (auto it = bestKContainer_[currResSet].rbegin(); it != bestKContainer_[currResSet].rend(); it++) {
                     (*it)->calcFinalScore();
                     (*it)->setRestraintsRatio(complexConst_.getRestraintsRatio((*it)->bbs_, (*it)->trans_));
                     (*it)->fullReport(oFile);
@@ -733,7 +733,7 @@ std::string HierarchicalFold::findMissingSubunits(unsigned long currResSet) cons
         unsigned long one = 1;
         unsigned long set = one << suIndex;
         if ((currResSet | set) != currResSet) {
-            std::shared_ptr<SuperBB> sbb = *(clusteredSBBS_[set].rbegin());
+            std::shared_ptr<SuperBB> sbb = *(bestKContainer_[set].rbegin());
             std::shared_ptr<const BB> bb = sbb->bbs_[0];
             ret += bb->getPDBFileName();
             ret += " ";
@@ -784,17 +784,15 @@ void HierarchicalFold::tryToConnect(int id, const SuperBB &sbb1, const SuperBB &
                 }
 
                 int bbPen = sbb1.backBonePen_ + sbb2.backBonePen_;
-                float newScore = 0.0;
                 // discard any invalid transformations
                 bool filtered = filterTrans(sbb1, sbb2, it.transformation(), penetrationThreshold_, bbPen,
-                                            backbonePenetrationThreshold, newScore, i, j);
+                                            backbonePenetrationThreshold, i, j);
                 if (filtered)
                     continue;
 
-                int numBurried = 0; // numBurried2;// + numBurried1;
                 FoldStep step(firstBB, secondBB, it.getScore());
                 std::shared_ptr<SuperBB> theNew =
-                    createJoined(sbb1, sbb2, it.transformation(), numBurried, bbPen, newScore, step, it.getScore());
+                    createJoined(sbb1, sbb2, it.transformation(), bbPen, step, it.getScore());
 
                 if (theNew->getRestraintsRatio() < complexConst_.getDistanceRestraintsRatioThreshold()) {
                     //            std::cout << "not enough restraints " << theNew->getRestraintsRatio() << " : " <<
@@ -811,16 +809,15 @@ void HierarchicalFold::tryToConnect(int id, const SuperBB &sbb1, const SuperBB &
 }
 
 std::shared_ptr<SuperBB> HierarchicalFold::createJoined(const SuperBB &sbb1, const SuperBB &sbb2, RigidTrans3 &trans,
-                                                        int numBurried, int bbPen, float newScore, FoldStep &step,
-                                                        int transScore) const { // first esume i < j
+                                                        int bbPen, FoldStep &step, float transScore) const { 
     std::shared_ptr<SuperBB> theNew = std::make_shared<SuperBB>(sbb1);
-    theNew->join(trans, sbb2, numBurried, bbPen, newScore, step, transScore);
+    theNew->join(trans, sbb2, bbPen, step, transScore);
     theNew->setRestraintsRatio(complexConst_.getRestraintsRatio(theNew->bbs_, theNew->trans_));
     return theNew;
 }
 
 bool HierarchicalFold::filterTrans(const SuperBB &sbb1, const SuperBB &sbb2, const RigidTrans3 &trans,
-                                   float penThreshold, int &bbPenetrations, int maxBBPenetrations, float &newScore,
+                                   float penThreshold, int &bbPenetrations, int maxBBPenetrations,
                                    unsigned int sbb1Index, unsigned int sbb2Index) const {
     
     // check distance constraints & restraints

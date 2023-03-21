@@ -144,6 +144,7 @@ bool BBContainer::readTrans(TransformationAndScore &trans, std::ifstream &transF
                 boost::split(split_results2, line, boost::is_any_of(":|\t"), boost::token_compress_on);
                 if (split_results2.size() > 3) {
                     trans.score_.totalScore_ = std::stof(split_results2[1].c_str());
+                    std::cout << "loaded score: " << trans.score_.totalScore_ << std::endl;
                 }
             }
         } catch (std::invalid_argument &e) {
