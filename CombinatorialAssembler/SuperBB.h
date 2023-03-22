@@ -30,7 +30,6 @@ class SuperBB {
     // This function checks for collissions - Receives transformation and a second super BB and decides if
     // they collide
     bool isPenetrating(const RigidTrans3 &trans, const SuperBB &other, float threshold) const;
-    void calcFinalScore();
     double calcRmsd(const SuperBB &other) const;
     double calcRmsd(const SuperBB &other, std::vector<std::vector<unsigned int>> &identGroups) const;
     void fullReport(std::ostream &s);

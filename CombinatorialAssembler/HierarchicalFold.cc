@@ -605,14 +605,12 @@ void HierarchicalFold::fold(const std::string &outFileNamePrefix) {
                     output = true;
                     clusteredBestK->setK(finalSizeLimit_);
                     for (auto it = currBestK->rbegin(); it != currBestK->rend(); it++) {
-                        (*it)->calcFinalScore();
                         (*it)->setRestraintsRatio(complexConst_.getRestraintsRatio((*it)->bbs_, (*it)->trans_));
                         (*it)->fullReport(outFile);
                     }
                     // output after clustering
                     currBestK->cluster(*clusteredBestK, 5.0, identGroups);
                     for (auto it = clusteredBestK->rbegin(); it != clusteredBestK->rend(); it++) {
-                        (*it)->calcFinalScore();
                         (*it)->setRestraintsRatio(complexConst_.getRestraintsRatio((*it)->bbs_, (*it)->trans_));
                         (*it)->fullReport(outFileClustered);
                     }
@@ -713,7 +711,6 @@ void HierarchicalFold::outputSubsets() const {
                 std::cout << outFileName << " missing " << findMissingSubunits(currResSet) << std::endl;
                 std::ofstream oFile(outFileName);
                 for (auto it = bestKContainer_[currResSet].rbegin(); it != bestKContainer_[currResSet].rend(); it++) {
-                    (*it)->calcFinalScore();
                     (*it)->setRestraintsRatio(complexConst_.getRestraintsRatio((*it)->bbs_, (*it)->trans_));
                     (*it)->fullReport(oFile);
                 }
@@ -745,8 +742,6 @@ std::string HierarchicalFold::findMissingSubunits(unsigned long currResSet) cons
 
 void HierarchicalFold::tryToConnect(int id, const SuperBB &sbb1, const SuperBB &sbb2, BestK &results, bool toAdd,
                                     std::promise<int> &output, std::vector<std::vector<unsigned int>> &identGroups) {
-
-    float penetrationThreshold_ = BB::penetrationThreshold_;
 
     unsigned int totalCa = 0;
     for (int i = 0; i < (int)sbb1.bbs_.size(); i++)
@@ -785,7 +780,7 @@ void HierarchicalFold::tryToConnect(int id, const SuperBB &sbb1, const SuperBB &
 
                 int bbPen = sbb1.backBonePen_ + sbb2.backBonePen_;
                 // discard any invalid transformations
-                bool filtered = filterTrans(sbb1, sbb2, it.transformation(), penetrationThreshold_, bbPen,
+                bool filtered = filterTrans(sbb1, sbb2, it.transformation(), bbPen,
                                             backbonePenetrationThreshold, i, j);
                 if (filtered)
                     continue;
@@ -794,7 +789,7 @@ void HierarchicalFold::tryToConnect(int id, const SuperBB &sbb1, const SuperBB &
                 std::shared_ptr<SuperBB> theNew =
                     createJoined(sbb1, sbb2, it.transformation(), bbPen, step, it.getScore());
 
-                if (theNew->getRestraintsRatio() < complexConst_.getDistanceRestraintsRatioThreshold()) {
+                if (theNew->getRestraintsRatio() < restraintsRatioThreshold_) {
                     //            std::cout << "not enough restraints " << theNew->getRestraintsRatio() << " : " <<
                     //            complexConst_.getDistanceRestraintsRatioThreshold();
                     continue;
@@ -817,8 +812,8 @@ std::shared_ptr<SuperBB> HierarchicalFold::createJoined(const SuperBB &sbb1, con
 }
 
 bool HierarchicalFold::filterTrans(const SuperBB &sbb1, const SuperBB &sbb2, const RigidTrans3 &trans,
-                                   float penThreshold, int &bbPenetrations, int maxBBPenetrations,
-                                   unsigned int sbb1Index, unsigned int sbb2Index) const {
+                                   int &bbPenetrations, int maxBBPenetrations, unsigned int sbb1Index, 
+                                   unsigned int sbb2Index) const {
     
     // check distance constraints & restraints
     for (unsigned int i = 0; i < sbb1.size_; i++) {
@@ -830,8 +825,6 @@ bool HierarchicalFold::filterTrans(const SuperBB &sbb1, const SuperBB &sbb2, con
             // check constraints first
             if (!complexConst_.areConstraintsSatisfied(bb1.getID(), bb2.getID(), t2))
                 return true;
-            // check restraints
-            //      if (!complexConst_.isRatioSatisfied(bb1.getID(), bb2.getID(), t2)) return true;
         }
     }
 
@@ -853,15 +846,10 @@ bool HierarchicalFold::filterTrans(const SuperBB &sbb1, const SuperBB &sbb2, con
 
             countFilterTras_ = countFilterTras_ + 1;
             
-            //bool should_skip = false;
             // check if radiuses are too far apart
             if ((pBB1->getRadius() + pBB2->getRadius()) < (pBB1->getCM() - t2*pBB2->getCM()).norm()) {
                 countFilterTrasSkipped_ = countFilterTrasSkipped_ + 1;
-
-                // std::cout << "skipping because radiuses far " << sbb1.bitIds() << "(" << i << ") " << sbb2.bitIds() 
-                // << "(" << j << ") " << (t*pBB1->getCM() - t2*pBB2->getCM()).norm() << std::endl;
                 continue;
-                // should_skip = true;
             }
 
 
@@ -879,19 +867,12 @@ bool HierarchicalFold::filterTrans(const SuperBB &sbb1, const SuperBB &sbb2, con
                 Vector3 v = t2 * it->position();
                 if (pBB1->getDistFromSurface(v) < 0) {
                     // getResidueEntry(v) when used in BBGrid.h will return -1*res_index if res_index is backbone
-                    if (pBB1->grid_->getResidueEntry(v) < 0 && pBB1->grid_->getDist(v) < -1.0) {
+                    if (pBB1->grid_->getResidueEntry(v) < 0 && pBB1->grid_->getDist(v) < penetrationThreshold_) {
                         int resEntry = pBB1->grid_->getResidueEntry(v) * -1;
                         if (pBB1->getAtomByResId(resEntry).getTempFactor() < minTemperatureToConsiderCollision)
                             continue;
-                        // if(shold_skip)
-                        //     std::cout << "bad collision " << sbb1.bitIds() << "(" << i << ") " << sbb2.bitIds() 
-                        //     << "(" << j << ") " << (t*pBB1->getCM() - t2*pBB2->getCM()).norm() << std::endl;
 
                         bbPenetrations++;
-                        //                      if (bbPenetrations > maxBBPenetrations) {
-                        //                          // std::cout << " bbPenetrations " << bbPenetrations << " " <<
-                        //                          maxBBPenetrations; return true;
-                        //                      }
                     }
                 }
             }

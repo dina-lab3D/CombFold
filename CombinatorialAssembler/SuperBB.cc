@@ -141,38 +141,6 @@ bool SuperBB::isPenetrating(const RigidTrans3 &trans, const SuperBB &other, floa
     return false;
 }
 
-void SuperBB::calcFinalScore() {
-    backBonePen_ = 0;
-    maxPen_ = 0.0;
-    multPen_ = 0;
-    singlePen_ = 0;
-    for (unsigned int i = 0; i < size_; i++) {
-        const BB &bb1 = *bbs_[i];
-        std::vector<RigidTrans3> tr;
-        for (unsigned int j = 0; j < size_; j++) {
-            tr.push_back((!trans_[j]) * trans_[i]);
-        }
-        // std::cout << " multPen_ " << multPen_ << " singlePen_ " << singlePen_ << std::endl;
-        for (unsigned int j = 0; j < size_; j++) {
-            if (i == j)
-                continue;
-            const BB &bb2 = *bbs_[j];
-            bb1.dockScore_->setGrid(bb2.grid_);
-            for (Molecule<ChemAtom>::const_iterator it = bb1.backBone_.begin(); it != bb1.backBone_.end(); it++) {
-                Vector3 v = tr[j] * it->position();
-                //                if (bb2.getDistFromSurface(v) < 0) {
-                if (bb2.getDistFromSurface(v) < -1.0) {
-                    // cerr << "a_penetration: " << bb2.getDistFromSurface(v) << endl;
-                    if (bb2.grid_->getResidueEntry(v) < 0) {
-                        // cerr << "b_penetration: " << backBonePen_ << endl;
-                        backBonePen_++;
-                    }
-                }
-            }
-        }
-    }
-}
-
 // RMSD between two SBBs (assuming same BBs)
 double SuperBB::calcRmsd(const SuperBB &other, std::vector<std::vector<unsigned int>> &identGroups) const {
     std::vector<std::vector<unsigned int>> presentIdentGroups;
@@ -405,16 +373,6 @@ TransIterator2::TransIterator2(const SuperBB &bb1, const SuperBB &bb2, int pbb1,
     trans_ = &(b1->getTransformations(b2->getID())); // BB::trans(*b1, *b2);
     it_ = trans_->begin();
     if (!isAtEnd()) {
-        // check if bb1.size+bb2.size is in the range of the transformations validity
-        // std::cerr << "TransIterator2: bb1 " << b1->getID() << " bb2 " << b2->getID() << " trans size " <<
-        // trans_->size() << std::endl;
-        int newSize = bb1_.size() + bb2_.size();
-        const std::pair<int, int> &range = b1->getTransformsRange(b2->getID());
-        // std::cerr << "newSize " << newSize << " range [" << range.first << " : " << range.second << "]" << std::endl;
-        if (newSize >= range.first && newSize <= range.second)
-            generateTransformation();
-        else
-            it_ = trans_->end();
-        // generateTransformation();
+        generateTransformation();
     }
 }

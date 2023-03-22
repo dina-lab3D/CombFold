@@ -1,7 +1,4 @@
-// Created by dina on 8/1/18.
-
 #include "BBContainer.h"
-
 #include <boost/algorithm/string.hpp>
 
 namespace {
@@ -12,18 +9,8 @@ std::string trim_extension(const std::string file_name) {
 }
 } // namespace
 
-BBContainer::BBContainer(const std::string SUFileName, float penetrationThr, std::string chemLibFileName) {
+BBContainer::BBContainer(const std::string SUFileName, std::string chemLibFileName) {
     readSUFile(SUFileName);
-
-    // init parameters
-    BB::scoreParams_.weights[0] = 0;
-    BB::scoreParams_.weights[1] = 0;
-    BB::scoreParams_.weights[2] = 0;
-    BB::scoreParams_.weights[3] = 1;
-    BB::scoreParams_.weights[4] = 0;
-    BB::scoreParams_.max_penetration = BB::penetrationThreshold_ = penetrationThr;
-    BB::gridResolution_ = 0.5; // p.getFloat("GRID_RESOLUTION");
-    BB::gridMargins_ = 5.0;    // p.getFloat("GRID_MARGINS");
 
     // prepare ChemLib
     ChemLib chemLib(chemLibFileName);
@@ -31,7 +18,7 @@ BBContainer::BBContainer(const std::string SUFileName, float penetrationThr, std
     // read the building blocks
     bbs_.reserve(numOfBBs_);
     for (unsigned int i = 0; i < numOfBBs_; i++) {
-        bbs_.push_back(std::make_shared<BB>(i, pdbs_[i], groupIDs_[i], groupID2size_[groupIDs_[i]], chemLib));
+        bbs_.push_back(std::make_shared<BB>(i, pdbs_[i], groupIDs_[i], chemLib, 0.5, 5.0));
     }
 }
 
@@ -69,8 +56,6 @@ void BBContainer::readTransformationFiles(std::string transFilePrefix, unsigned 
             inS.close();
         }
     }
-
-    computeRanges(1);
 }
 
 int BBContainer::readSUFile(const std::string SUFileName) {
@@ -92,23 +77,20 @@ int BBContainer::readSUFile(const std::string SUFileName) {
             numOfBBs_++;
             pdbs_.push_back(pdbName);
             // group assignment
-            int groupID = 1;
+            int groupID = 0;
             if (split_results.size() == 2) {
                 groupID = stoi(split_results[1]);
+                if (groupID <= 0) {
+                    std::cerr << "Group ID must be positive" << std::endl;
+                }
             }
             groupIDs_.push_back(groupID);
-            if (groupID2size_.find(groupID) == groupID2size_.end()) {
-                groupID2size_[groupID] = 1;
-            } else {
-                groupID2size_[groupID]++;
-            }
         }
     }
     return numOfBBs_;
 }
 
 bool BBContainer::readTrans(TransformationAndScore &trans, std::ifstream &transFile) {
-
     std::string line;
     if (!transFile.eof()) {
         getline(transFile, line);
@@ -116,61 +98,35 @@ bool BBContainer::readTrans(TransformationAndScore &trans, std::ifstream &transF
         // skip comments
         if (line[0] == '#' || line[0] == '\0')
             return false;
+
         std::vector<std::string> split_results;
-        boost::split(split_results, line, boost::is_any_of(" "), boost::token_compress_on);
-        // std::cerr << split_results.size() << std::endl;
-        if (split_results.size() < 7)
+        boost::split(split_results, line, boost::is_any_of(":|\t"), boost::token_compress_on);
+        if (split_results.size() != 4) {
+            std::cerr << "Wrong number of fields in transformation file, should be: "
+                      << "index(int) | score(float) | comment | transformation(space seperated 6 floats)" << std::endl;
+            return false;
+        }
+
+        boost::trim(split_results[3]);
+        std::vector<std::string> splitted_transformation;
+        boost::split(splitted_transformation, split_results[3], boost::is_any_of(" "), boost::token_compress_on);
+
+        if (splitted_transformation.size() != 6)
             return false;
 
         // extract trans
-        unsigned int trans_index = split_results.size() - 6;
-        RigidTrans3 tr(Vector3(std::stof(split_results[trans_index].c_str()),
-                               std::stof(split_results[trans_index + 1].c_str()),
-                               std::stof(split_results[trans_index + 2].c_str())),
-                       Vector3(std::stof(split_results[trans_index + 3].c_str()),
-                               std::stof(split_results[trans_index + 4].c_str()),
-                               std::stof(split_results[trans_index + 5].c_str())));
+        RigidTrans3 tr(Vector3(std::stof(splitted_transformation[0].c_str()),
+                               std::stof(splitted_transformation[1].c_str()),
+                               std::stof(splitted_transformation[2].c_str())),
+                       Vector3(std::stof(splitted_transformation[3].c_str()),
+                               std::stof(splitted_transformation[4].c_str()),
+                               std::stof(splitted_transformation[5].c_str())));
         trans.refFrame_ = tr;
         trans.score_.totalScore_ = 1.0;
         trans.dist_ = 1.0;
 
-        try {
-            // try to split and get rmsd and score
-            if (split_results.size() == 9) { // input of num, score, rmsd, trans
-                trans.score_.totalScore_ = std::stof(split_results[1].c_str());
-                std::cout << "loaded score " << trans.score_.totalScore_ << std::endl;
-            } else {
-                std::vector<std::string> split_results2;
-                boost::split(split_results2, line, boost::is_any_of(":|\t"), boost::token_compress_on);
-                if (split_results2.size() > 3) {
-                    trans.score_.totalScore_ = std::stof(split_results2[1].c_str());
-                    std::cout << "loaded score: " << trans.score_.totalScore_ << std::endl;
-                }
-            }
-        } catch (std::invalid_argument &e) {
-            std::cerr << "Couldn't get score from trans file, continue without\n";
-        }
-
-        try {
-            // try to split and get rmsd and score
-            if (split_results.size() == 9) { // input of num, score, rmsd, trans
-                trans.dist_ = std::stof(split_results[2].c_str());
-            } else {
-                std::vector<std::string> split_results2;
-                boost::split(split_results2, line, boost::is_any_of(":|\t"), boost::token_compress_on);
-                if (split_results2.size() > 3) {
-                    trans.dist_ = std::stof(split_results2[2].c_str());
-                }
-            }
-        } catch (std::invalid_argument &e) {
-            std::cerr << "Couldn't get RMSD from trans file, continue without\n";
-        }
+        trans.score_.totalScore_ = std::stof(split_results[1].c_str());
+        std::cout << "loaded score: " << trans.score_.totalScore_ << std::endl;
     }
     return !transFile.eof();
-}
-
-void BBContainer::computeRanges(int margin) {
-    for (size_t i = 0; i < numOfBBs_; i++) {
-        bbs_[i]->computeRanges(bbs_, margin);
-    }
 }

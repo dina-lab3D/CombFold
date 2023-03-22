@@ -23,9 +23,6 @@ namespace po = boost::program_options;
 // #include <gperftools/profiler.h>
 
 // forward declarations
-void clusterResults(const std::string resFileName, const std::vector<std::shared_ptr<const BB>> &bbs,
-                    double clusterRMSD);
-
 int main(int argc, char *argv[]) {
     // output arguments
     for (int i = 0; i < argc; i++)
@@ -39,7 +36,7 @@ int main(int argc, char *argv[]) {
     unsigned int maxResultPerResSet = 0;
 
     std::string outFileNamePrefix;
-    double constraintsRatio = 0.7;
+    double restraintsRatio = 0.7;
     double clusterRMSD = 5.0;
 
     // positional
@@ -54,9 +51,9 @@ int main(int argc, char *argv[]) {
 
     // optional
     desc.add_options()("help,h", "CombDock help")("version", "CombDock 2.0 2019")(
-        "penetrationThr,p", po::value<double>(&penetrationThr)->default_value(-5.0),
-        "maximum allowed penetration between subunit surfaces (default = -5.0)")(
-        "constraintsRatio,r", po::value<double>(&constraintsRatio)->default_value(0.7),
+        "penetrationThr,p", po::value<double>(&penetrationThr)->default_value(-1.0),
+        "maximum allowed penetration between subunit surfaces (default = -1.0)")(
+        "restraintsRatio,r", po::value<double>(&restraintsRatio)->default_value(0.7),
         "constraints ratio (default = 0.7)")("clusterRMSD,c", po::value<double>(&clusterRMSD)->default_value(5.0),
                                              "final clustering RMSD (default = 5.0)")
 
@@ -122,19 +119,19 @@ int main(int argc, char *argv[]) {
     std::string argv_str(argv[0]);
     std::string base = argv_str.substr(0, argv_str.find_last_of("/"));
     std::string chemLibFileName = base + "/chem_params.txt";
-    BBContainer bbContainer(suFileName, penetrationThr, chemLibFileName);
+    BBContainer bbContainer(suFileName, chemLibFileName);
     bbContainer.readTransformationFiles(prefix, transNumToRead);
 
     std::cout << "Starting HierarchicalFold" << std::endl;
     HierarchicalFold hierarchalFold(bbContainer.getBBs(), bestK, maxResultPerResSet, minTemperatureToConsiderCollision,
-                                    maxBackboneCollisionPerChain);
+                                    maxBackboneCollisionPerChain, penetrationThr, restraintsRatio);
     for (unsigned int i = 0; i < bbContainer.getBBsNumber(); i++) {
         std::shared_ptr<SuperBB> sbb = std::make_shared<SuperBB>(bbContainer.getBB(i), bbContainer.getBBsNumber());
         hierarchalFold.add(sbb, i);
     }
 
     // read constraints
-    hierarchalFold.readConstraints(constraintsFileName, constraintsRatio);
+    hierarchalFold.readConstraints(constraintsFileName);
 
     HierarchicalFold::timer_.reset();
 

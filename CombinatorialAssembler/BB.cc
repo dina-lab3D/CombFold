@@ -2,17 +2,9 @@
 
 #include <Common.h>
 #include <connolly_surface.h>
-// #include <ShuoSurface.h>
 
-// static declarations
-float BB::penetrationThreshold_ = 3.5;
-ScoreParams BB::scoreParams_;
-float BB::gridResolution_(0.0);
-float BB::gridMargins_(0.0);
-
-
-BB::BB(int id, const std::string pdbFileName, int groupID, int groupSize, const ChemLib &lib)
-    : id_(id), groupId_(groupID), groupSize_(groupSize), pdbFileName_(pdbFileName) {
+BB::BB(int id, const std::string pdbFileName, int groupID, const ChemLib &lib, float gridResolution, float gridMargins)
+    : id_(id), groupId_(groupID), pdbFileName_(pdbFileName) {
     // read atoms
     Common::readChemMolecule(pdbFileName_, allAtoms_, lib);
     std::cout << "Done reading ChemMolecule " << allAtoms_.size() << std::endl;
@@ -33,25 +25,17 @@ BB::BB(int id, const std::string pdbFileName, int groupID, int groupSize, const 
     std::cout << "Surface size " << msSurface_.size() << std::endl;
 
     // compute grid
-    grid_ = new BBGrid(msSurface_, gridResolution_, gridMargins_, 1.5);
+    grid_ = new BBGrid(msSurface_, gridResolution, gridMargins, 1.5);
     grid_->computeDistFromSurface(msSurface_);
     grid_->markTheInside(allAtoms_);
     grid_->markResidues(backBone_);
     std::cout << "Done compute grid " << pdbFileName_ << std::endl;
 
-    // compute shuo surface from Connolly MS
-    /*ShuoSurface shuo(msSurface_, allAtoms_, *grid_);
-    shuo.computeShuoSurface(surface_);
-    std::cout << "Shuo surface done " << surface_.size() << std::endl;
-    */
     std::vector<Atom *> atomsMap;
     atomsMap.push_back(&(*allAtoms_.begin()));
     for (ChemMolecule::iterator i = allAtoms_.begin(); i != allAtoms_.end(); i++) {
         atomsMap.push_back(&(*i));
     }
-
-    dockScore_ = new GeomScore(msSurface_, scoreParams_.weights, scoreParams_.max_penetration, 0.5);
-    dockScore_->buildTree();
 
     computeFragments(); // get the endpoints
 
@@ -70,8 +54,6 @@ BB::BB(int id, const std::string pdbFileName, int groupID, int groupSize, const 
     std::cout << " done reading BB " << pdbFileName_.c_str() << std::endl;
 }
 
-const Atom &BB::getAtomByResId(unsigned int resId) const { return resIndexToCAAtom.at(resId); }
-
 void BB::computeFragments() {
     // calculate endpoints
     char currChain;
@@ -84,7 +66,8 @@ void BB::computeFragments() {
         char chain = i->chainId();
         int resIndex = i->residueIndex();
         // one more residue of the same chain - advance
-        if (currChainSet && currChain == chain) {
+        // if over 20 residues diff - new fragment
+        if (currChainSet && currChain == chain && resIndex - prevResIndex <= 20) {
             prevResIndex = resIndex;
         } else {                // new chain
             if (currChainSet) { // save currChain
@@ -131,61 +114,18 @@ void BB::getChainConnectivityConstraints(const BB &otherBB,
     }
 }
 
-//  float BB::scoreForTrans(Score &score, RigidTrans3 trans, BB &other) {
-//    float RADIUS = 1.5;
-//    float RADIUS2 = RADIUS * RADIUS;
-//    GeomHash <Triangle, TransformationAndScore*> *gh = trans_[ENTRY(id_, other.id_)];
-//    //cerr << "GH " << gh << endl;
-//    Triangle t(t_);
-//    t *= trans;
-//    HashResult<TransformationAndScore*> result;
-//    gh->query(t, RADIUS, result); //!!!!!
-//    float lscore = 0;
-//    TransformationAndScore *bestTrans(NULL);
-//    for (HashResult<TransformationAndScore*>::iterator it = result.begin(); it != result.end(); it++) {
-//      float dist2 = t.dist2((*it)->t_);
-//      //cerr << "trans " << trans << " t " << t << " (*it)->refFrame_ " << (*it)->refFrame_ << " (*it)->t_ " <<
-//      (*it)->t_ << " dist2 " << dist2 << " score " << (*it)->score_.totalScore_ << endl; if (dist2 < RADIUS2 &&
-//          lscore < (*it)->score_.totalScore_) {
-//          lscore = (*it)->score_.totalScore_;
-//          bestTrans = *it;
-//      }
-//    }
-//    if (bestTrans != NULL) {
-//      for (int i = 0; i < NO_OF_RANGES; i++) {
-//        score.ps_[i].count_ += bestTrans->score_.ps_[i].count_;
-//        score.ps_[i].surface_ += bestTrans->score_.ps_[i].surface_;
-//      }
-//      score.totalScore_ += bestTrans->score_.totalScore_;
-//      lscore = bestTrans->score_.totalScore_;
-//    } else {
-//      //cerr << " for trans " << trans  << " no entry " << " bb1 " << id_ << " bb2 " << other.id_ << endl;
-//    }
-//    return lscore;
-//  }
-
 bool BB::isPenetrating(const RigidTrans3 &trans, const BB &other, float threshold) const {
-    //  for (vector<SurfaceAtom>::iterator it = other.sas_.begin(); it != other.sas_.end(); it++) {
-    // float penetration = getDistFromSurface(trans * it->pos_) - it-> radius_;
-    // float max = 1000;
     for (Surface::const_iterator it = other.surface_.begin(); it != other.surface_.end(); it++) {
         float penetration = getDistFromSurface(trans * it->position());
         if (threshold > penetration) {
             // cerr << "trans " << trans << " penetrates " << penetration << endl;
             return true;
         }
-        //
-        // if (max > penetration) {
-        //  max = penetration;
-        //}
     }
-    // cerr << id_ << " " << other.id_ << " maxPen " << max << endl;
     return false;
 }
 
 float BB::maxPenetration(const RigidTrans3 &trans, const BB &other) const {
-    //  for (vector<SurfaceAtom>::iterator it = other.sas_.begin(); it != other.sas_.end(); it++) {
-    // float penetration = getDistFromSurface(trans * it->pos_) - it-> radius_;
     float max = 1000;
     for (Surface::const_iterator it = other.surface_.begin(); it != other.surface_.end(); it++) {
         float penetration = getDistFromSurface(trans * it->position());
@@ -194,17 +134,6 @@ float BB::maxPenetration(const RigidTrans3 &trans, const BB &other) const {
         }
     }
     return max;
-}
-
-void BB::computeRanges(const std::vector<std::shared_ptr<const BB>> &bbs, int margin) const {
-    for (size_t i = 0; i < bbs.size(); i++) {
-        std::pair<int, int> range;        // = computeRange(*bbs[i], margin);
-        if (groupId_ == bbs[i]->groupId_) // same group
-            range = std::make_pair(1, groupSize_ + margin);
-        else
-            range = std::make_pair(std::max(groupSize_, bbs[i]->groupSize_) - margin, trans_.size());
-        transformationRanges_.push_back(range);
-    }
 }
 
 bool BB::isIdent(const BB &otherBB) const {
@@ -240,13 +169,6 @@ bool BB::isIdent(const BB &otherBB) const {
                 std::cout << "different trans score" << i << std::endl;
                 return false;
             }
-
-            // TODO: better way to compare transformations (this has problem with more than 2 copies of chain
-            //            if(!(trans_[i][j]->trans().translation() -
-            //            otherBB.trans_[i][j]->trans().translation()).isZero()){
-            //                std::cout << "different trans translation" << i << std::endl;
-            //                return false;
-            //            }
         }
     }
     return true;

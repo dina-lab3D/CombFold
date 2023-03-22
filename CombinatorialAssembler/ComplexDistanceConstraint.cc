@@ -120,7 +120,7 @@ int ComplexDistanceConstraint::readRestraintsFile(const std::string fileName) {
                         float maxDistance = crosslinks[i].getMaxDistance() + (rOffset + lOffset) * 3.0;
                         float minDistance = crosslinks[i].getMinDistance();
 
-                                                int ind1 = *suIndexIter1 * noOfSUs_ + *suIndexIter2;
+                        int ind1 = *suIndexIter1 * noOfSUs_ + *suIndexIter2;
                         DistanceRestraint d1(rcoord, lcoord, maxDistance, minDistance, crosslinks[i].getWeight());
                         restraintIndsToCrosslinkInds_[ind1].push_back(i);
                         restraints_[ind1].push_back(d1);
@@ -139,8 +139,6 @@ int ComplexDistanceConstraint::readRestraintsFile(const std::string fileName) {
             }
         }
     }
-    // std::string readFileName = fileName + ".read";
-    // writeCrossLinkFile(readFileName, crossLinks_);
     return crosslinks.size();
 }
 

@@ -1,10 +1,3 @@
-/**
- * \file FoldStep.h
- * \brief
- *
- * \authors Yuval Inbar, Dina Schneidman
- *
- */
 #ifndef FOLDSTEP_H
 #define FOLDSTEP_H
 

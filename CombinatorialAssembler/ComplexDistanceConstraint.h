@@ -22,9 +22,6 @@ class ComplexDistanceConstraint {
     int readRestraintsFile(const std::string fileName);
     int addChainConnectivityConstraints();
 
-    float getDistanceRestraintsRatioThreshold() const { return distanceRestraintsRatioThreshold_; }
-    void setDistanceRestraintsRatioThreshold(float r) { distanceRestraintsRatioThreshold_ = r; }
-
     int numberOfRestraints(int suInd1, int suInd2) const {
         int ind = suInd1 * noOfSUs_ + suInd2;
         return restraints_[ind].size();
@@ -42,14 +39,6 @@ class ComplexDistanceConstraint {
     float getRestraintsRatio(const std::vector<std::shared_ptr<const BB>> &bbs,
                              const std::vector<RigidTrans3> &trans) const;
 
-    // restraints satisfaction: a predefined ratio needs to be satisfied
-    bool isRatioSatisfied(const std::vector<std::shared_ptr<const BB>> &bbs,
-                          const std::vector<RigidTrans3> &trans) const {
-        if (getRestraintsRatio(bbs, trans) < distanceRestraintsRatioThreshold_)
-            return false;
-        return true;
-    }
-
   private:
     void addConstraint(int suInd1, int suInd2, Vector3 receptorAtom, Vector3 ligandAtom, float maxDistance,
                        float minDistance = 0);
@@ -65,7 +54,6 @@ class ComplexDistanceConstraint {
     int noOfSUs_;
     std::vector<std::vector<DistanceRestraint>> constraints_;
     std::vector<std::vector<DistanceRestraint>> restraints_;
-    float distanceRestraintsRatioThreshold_ = 1.0; // required ratio of satisfied distances
     int numberOfConstraints_ = 0;
     int numberOfRestraints_ = 0;
     std::vector<std::vector<unsigned int>> restraintIndsToCrosslinkInds_;

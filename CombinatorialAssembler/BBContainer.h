@@ -11,7 +11,7 @@
 class BBContainer {
   public:
     // Constructor
-    BBContainer(std::string SUFileName, float penetrationThr, std::string chemLibFileName);
+    BBContainer(std::string SUFileName, std::string chemLibFileName);
 
     // Group: access
     std::shared_ptr<const BB> getBB(unsigned int bbIndex) const { return bbs_[bbIndex]; }
@@ -23,7 +23,6 @@ class BBContainer {
   private:
     int readSUFile(const std::string SUFileName);
     bool readTrans(TransformationAndScore &trans, std::ifstream &transFile);
-    void computeRanges(int margin);
 
   private:
     // PDB filenames
@@ -39,9 +38,6 @@ class BBContainer {
     // BBs in the same group will be assembled first
     // if no number is given, all the BBs are considered a group
     std::vector<int> groupIDs_;
-
-    // map between group id and size
-    std::map<int, int> groupID2size_;
 };
 
 #endif // BBCONTAINER_H

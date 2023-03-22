@@ -9,6 +9,7 @@
 #define BESTKCONTAINER_H
 
 #include <unordered_map>
+#include "BestK.h"
 
 class BestKContainer : private std::vector<BestK *> {
   public:
