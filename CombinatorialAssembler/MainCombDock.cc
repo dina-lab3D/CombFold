@@ -1,10 +1,3 @@
-/**
- * \file MainCombDock.cc
- *
- * Author: Dina Schneidman, Yuval Inbar
- *
- */
-
 #include "BBContainer.h"
 #include "HierarchicalFold.h"
 
@@ -22,7 +15,6 @@ namespace po = boost::program_options;
 
 // #include <gperftools/profiler.h>
 
-// forward declarations
 int main(int argc, char *argv[]) {
     // output arguments
     for (int i = 0; i < argc; i++)
@@ -30,18 +22,18 @@ int main(int argc, char *argv[]) {
     std::cout << std::endl;
 
     // input parsing
-    double penetrationThr = -5.0;
-    float maxBackboneCollisionPerChain = 0.1;
-    float minTemperatureToConsiderCollision = 0;
-    unsigned int maxResultPerResSet = 0;
+    double penetrationThr;
+    float maxBackboneCollisionPerChain;
+    float minTemperatureToConsiderCollision;
+    unsigned int maxResultPerResSet;
 
     std::string outFileNamePrefix;
-    double restraintsRatio = 0.7;
-    double clusterRMSD = 5.0;
+    double restraintsRatio;
+    double clusterRMSD;
 
     // positional
     std::string suFileName;
-    std::string prefix;
+    std::string transFilesPrefix;
     int transNumToRead;
     int bestK;
     std::string constraintsFileName;
@@ -71,7 +63,7 @@ int main(int argc, char *argv[]) {
     // required options: currently 5
     po::options_description hidden("Hidden options");
     hidden.add_options()("SUlist", po::value<std::string>(&suFileName)->required(), "SU list file name")(
-        "transFilesPrefix", po::value<std::string>(&prefix)->required(),
+        "transFilesPrefix", po::value<std::string>(&transFilesPrefix)->required(),
         "Trans files prefix")("transNumToRead", po::value<int>(&transNumToRead)->required(),
                               "# of tranformations")("bestK", po::value<int>(&bestK)->required(), "bestK")(
         "constraintsFile", po::value<std::string>(&constraintsFileName)->required(), "constraints file name");
@@ -112,23 +104,16 @@ int main(int argc, char *argv[]) {
     auto start = std::chrono::high_resolution_clock::now();
     HierarchicalFold::timerAll_.reset();
 
-    std::vector<std::string> pdbs;
-    std::vector<TransformationAndScore *> trans1, trans2;
-
     std::cerr << "Before process input" << std::endl;
     std::string argv_str(argv[0]);
     std::string base = argv_str.substr(0, argv_str.find_last_of("/"));
     std::string chemLibFileName = base + "/chem_params.txt";
     BBContainer bbContainer(suFileName, chemLibFileName);
-    bbContainer.readTransformationFiles(prefix, transNumToRead);
+    bbContainer.readTransformationFiles(transFilesPrefix, transNumToRead);
 
     std::cout << "Starting HierarchicalFold" << std::endl;
-    HierarchicalFold hierarchalFold(bbContainer.getBBs(), bestK, maxResultPerResSet, minTemperatureToConsiderCollision,
+    HierarchicalFold hierarchalFold(bbContainer, bestK, maxResultPerResSet, minTemperatureToConsiderCollision,
                                     maxBackboneCollisionPerChain, penetrationThr, restraintsRatio);
-    for (unsigned int i = 0; i < bbContainer.getBBsNumber(); i++) {
-        std::shared_ptr<SuperBB> sbb = std::make_shared<SuperBB>(bbContainer.getBB(i), bbContainer.getBBsNumber());
-        hierarchalFold.add(sbb, i);
-    }
 
     // read constraints
     hierarchalFold.readConstraints(constraintsFileName);

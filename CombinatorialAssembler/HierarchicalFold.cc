@@ -1,17 +1,636 @@
-/*
-  This class creates superBBs in the fold function
-*/
-
 #include "HierarchicalFold.h"
-#include "SubSet.h"
 
-#include "ctpl_stl.h"
 #include <boost/graph/adjacency_list.hpp>
 #include <boost/graph/connected_components.hpp>
 
 Timer HierarchicalFold::timer_;
 Timer HierarchicalFold::timerAll_;
 unsigned int HierarchicalFold::countResults_(0);
+
+std::vector<std::vector<unsigned int>> createIdentGroups(unsigned int N_, BestKContainer &bestKContainer_) {
+    std::vector<bool> addedToGroup(N_, false);
+    std::vector<std::vector<unsigned int>> identGroups;
+    for (unsigned int i = 0; i < N_; i++) {
+        std::shared_ptr<SuperBB> sbbI = *(bestKContainer_[1 << i].begin());
+        const std::shared_ptr<const BB> bbI = sbbI->bbs_[0];
+
+        if (addedToGroup[i])
+            continue;
+        addedToGroup[i] = true;
+        std::vector<unsigned int> identical;
+
+        for (unsigned int j = i + 1; j < N_; j++) {
+            std::cout << "checking ident " << i << " & " << j << std::endl;
+            std::shared_ptr<SuperBB> sbbJ = *(bestKContainer_[1 << j].begin());
+
+            const std::shared_ptr<const BB> bbJ = sbbJ->bbs_[0];
+
+            if (bbI->isIdent(*bbJ)) {
+                addedToGroup[j] = true;
+                std::cout << "found ident " << i << " " << j << std::endl;
+                identical.push_back(j);
+            }
+        }
+        if (identical.size() > 0) {
+            identical.insert(identical.begin(), i);
+            identGroups.push_back(identical);
+        }
+    }
+    std::cout << "---- ident groups " << std::endl;
+    for (std::vector<unsigned int> identGroup : identGroups) {
+        std::cout << "ident group: ";
+        for (unsigned int i : identGroup) {
+            std::cout << i << " ";
+        }
+        std::cout << std::endl;
+    }
+
+    return identGroups;
+}
+
+std::map<unsigned int, std::vector<unsigned int>> createAssemblyGroupsMap(unsigned int N_,
+                                                                          BestKContainer &bestKContainer_) {
+    std::map<unsigned int, std::vector<unsigned int>> assemblyGroupsMap;
+    for (unsigned int i = 0; i < N_; i++) {
+        std::shared_ptr<SuperBB> sbbI = *(bestKContainer_[1 << i].begin());
+        const std::shared_ptr<const BB> bbI = sbbI->bbs_[0];
+        if (assemblyGroupsMap.count(bbI->groupId()) == 0) {
+            std::vector<unsigned int> newGroup;
+            assemblyGroupsMap[bbI->groupId()] = newGroup;
+        }
+        assemblyGroupsMap[bbI->groupId()].push_back(i);
+    }
+    std::cout << "---- assembly groups " << std::endl;
+    // std::vector<std::vector<unsigned int>> assemblyGroups;
+    for (const auto &[groupId, groupBBIds] : assemblyGroupsMap) {
+        std::cout << "assembly group " << groupId << ":";
+        for (unsigned int i : groupBBIds) {
+            std::cout << i << " ";
+        }
+        std::cout << std::endl;
+        // assemblyGroups.push_back(groupBBIds);
+    }
+    return assemblyGroupsMap;
+}
+
+void printBestK(unsigned int N_, BestK *bestK) {
+    // just for print
+    std::map<unsigned int, unsigned int> count_new_kept_by_bb;
+    std::map<unsigned int, unsigned int> count_new_kept_by_resSet;
+    for (unsigned int bit_index = 0; bit_index < N_; bit_index++)
+        count_new_kept_by_bb[bit_index] = 0;
+    for (auto it1 = bestK->begin(); it1 != bestK->end(); it1++) {
+        if (count_new_kept_by_resSet.count((**it1).bitIds()) == 0)
+            count_new_kept_by_resSet[(**it1).bitIds()] = 0;
+        count_new_kept_by_resSet[(**it1).bitIds()] += 1;
+        for (unsigned int bit_index = 0; bit_index < N_; bit_index++)
+            if (((**it1).bitIds() & (1 << bit_index)) > 0) {
+                count_new_kept_by_bb[bit_index] += 1;
+            }
+    }
+
+    std::cout << "scores of saved " << bestK->minScore() << ":" << bestK->maxScore() << std::endl;
+    std::cout << "new kept results by chain ";
+    for (const auto &elem : count_new_kept_by_bb)
+        std::cout << elem.first << ":" << elem.second << ", ";
+    std::cout << std::endl << "new kept results by resSet ";
+    for (const auto &elem : count_new_kept_by_resSet)
+        std::cout << elem.first << ":" << elem.second << ", ";
+    std::cout << std::endl;
+}
+
+bool isValidBasedOnAssembly(std::map<unsigned int, std::vector<unsigned int>> assemblyGroupsMap,
+                            unsigned long currResSet) {
+    if (assemblyGroupsMap.size() <= 1)
+        return true;
+
+    bool seenPartialGroup = false;
+    int numberOfGroups = 0;
+
+    bool seenGroupZero = false;
+
+    for (const auto &[groupId, assemblyGroup] : assemblyGroupsMap) {
+        bool seenZero = false;
+        bool seenOne = false;
+
+        for (unsigned long i = 0; i < assemblyGroup.size(); i++) {
+            if (((1 << assemblyGroup[i]) & currResSet) != 0)
+                seenOne = true;
+            else
+                seenZero = true;
+        }
+        if (groupId == 0) {
+            // assembly group 0 is special, this group should not be assembled before joining others
+            // so we never treat it as partial, but it can't be with another partial group
+            if (seenOne)
+                seenGroupZero = true;
+        } else {
+            if (seenOne)
+                numberOfGroups++;
+
+            if (seenZero && seenOne) {
+                seenPartialGroup = true;
+            }
+        }
+    }
+    if (numberOfGroups >= 1 && seenPartialGroup && seenGroupZero)
+        return false;
+
+
+    if (numberOfGroups > 1 && seenPartialGroup)
+        return false;
+
+    return true;
+}
+
+void HierarchicalFold::fold(const std::string &outFileNamePrefix) {
+    std::vector<std::vector<unsigned int>> identGroups = createIdentGroups(N_, bestKContainer_);
+    std::map<unsigned int, std::vector<unsigned int>> assemblyGroupsMap = createAssemblyGroupsMap(N_, bestKContainer_);
+
+    std::map<unsigned int, BestK *> precomputedResults;
+    for (unsigned int i = 2; i <= N_; i++)
+        precomputedResults[i] = new BestK(K_);
+
+    // populate with homomers subunits
+    for (std::vector<unsigned int> identGroup : identGroups) {
+        for (unsigned int groupDivider = 1; (identGroup.size() / groupDivider) >= 5; groupDivider++) {
+        if ((identGroup.size() % groupDivider) != 0)
+            continue;
+        unsigned int groupSize = identGroup.size() / groupDivider;
+        std::vector<std::shared_ptr<SuperBB>> groupSBBs;
+        for (unsigned int j = 0; j < groupSize; j++) {
+            groupSBBs.push_back(*(bestKContainer_[1 << identGroup[j]].begin()));
+        }
+        std::cout << "searching for size " << groupSBBs.size() << " has " << precomputedResults.count(groupSBBs.size())
+                  << std::endl;
+        createSymmetry(groupSBBs, *precomputedResults[groupSBBs.size()]);
+        }
+    }
+
+    // Hierarchical Assembly
+    for (unsigned int length = 2; length <= N_; length++) { // # subunits iteration
+        std::cout << "*** running iteration " << length
+                  << " prev kept results: " << keptResultsByLength[length - 1]->size() << std::endl;
+        std::map<unsigned long, BestK *> best_k_by_id;
+
+        // populate with precomputedResults
+        for (auto it1 = precomputedResults[length]->begin(); it1 != precomputedResults[length]->end(); it1++) {
+            unsigned long currResSet = (**it1).bitIds();
+            if (best_k_by_id.count(currResSet) == 0)
+                best_k_by_id[currResSet] = new BestK(K_);
+            best_k_by_id[currResSet]->push(*it1);
+        }
+
+        // try to assemble from each pair of kept results that together have (length) subunits
+        for (unsigned int firstResultSize = 1; firstResultSize <= length / 2; firstResultSize++) {
+            unsigned int secondResultSize = length - firstResultSize;
+            std::cout << "** running sub-iteration " << firstResultSize << " " << secondResultSize << std::endl;
+            std::cout << "counters " << countFilterTrasSkipped_ << "/" << countFilterTras_ << std::endl;
+
+            for (auto it1 = keptResultsByLength[firstResultSize]->begin();
+                 it1 != keptResultsByLength[firstResultSize]->end(); it1++) {
+                SuperBB sbb1 = **it1;
+                unsigned long setA = sbb1.bitIds();
+
+                for (auto it2 = keptResultsByLength[secondResultSize]->begin();
+                     it2 != keptResultsByLength[secondResultSize]->end(); it2++) {
+
+                    if (firstResultSize == secondResultSize &&
+                        std::distance(keptResultsByLength[firstResultSize]->begin(), it1) >
+                            std::distance(keptResultsByLength[secondResultSize]->begin(), it2))
+                        continue; // Since in this case there are 2 identical loops, don't do things twice
+
+                    // If there are identical subunits in both results, rewrite the second result to not have the same
+                    std::shared_ptr<SuperBB> sbb2Pointer = getMatchingSBB(sbb1, **it2, identGroups);
+                    if (sbb2Pointer == NULL)
+                        continue;
+                    SuperBB sbb2 = *sbb2Pointer;
+
+                    // make sure that the two results can be connected
+                    unsigned long setB = sbb2.bitIds();
+                    if ((setA & setB) != 0)
+                        continue;
+                    unsigned long currResSet = setA | setB;
+                    if(!isValidBasedOnAssembly(assemblyGroupsMap, currResSet)){
+                        std::cout << "invalid assembly " << currResSet << std::endl;
+                        continue;
+                    }
+
+                    // connect the two results and add all new combined results to best_k_by_id[currResSet]
+                    if (best_k_by_id.count(currResSet) == 0)
+                        best_k_by_id[currResSet] = new BestK(K_);
+
+                    unsigned int resCountBefore = best_k_by_id[currResSet]->size();
+                    float minScoreBefore = best_k_by_id[currResSet]->minScore();
+
+                    std::promise<int> promise1;
+                    this->tryToConnect(1, sbb1, sbb2, *best_k_by_id[currResSet], (length < N_), promise1, identGroups);
+
+                    if (resCountBefore < best_k_by_id[currResSet]->size() ||
+                        minScoreBefore != best_k_by_id[currResSet]->minScore())
+                        std::cout << "found more for " << currResSet << " based on " << setA << " and " << setB
+                                  << " before: " << resCountBefore << " after: " << best_k_by_id[currResSet]->size()
+                                  << " scores " << best_k_by_id[currResSet]->minScore() << ":"
+                                  << best_k_by_id[currResSet]->maxScore() << std::endl;
+                }
+            }
+        }
+
+        // cluster results and save them
+        std::map<unsigned long, BestK *> bestForSubunitId;
+        keptResultsByLength[length] = new BestK(K_);
+
+        for (const auto &[currResSet, currBestK] : best_k_by_id) {
+            if (currBestK->size() > 0) {
+                BestK *clusteredBestK = bestKContainer_.newBestK(currResSet);
+                currBestK->cluster(*clusteredBestK, 1.0, identGroups);
+
+                std::cerr << "clustering resSet " << currResSet << " before: " << currBestK->size() << " after "
+                          << bestKContainer_[currResSet].size() << " scores " << bestKContainer_[currResSet].minScore()
+                          << ":" << bestKContainer_[currResSet].maxScore() << std::endl;
+
+                for (unsigned long i = 0; i < N_; i++) {
+                    if ((currResSet & (1 << i)) != 0) {
+                        if (bestForSubunitId.count(i) == 0) {
+                            bestForSubunitId[i] = new BestK(1);
+                        }
+                        bestForSubunitId[i]->push(*clusteredBestK->rbegin());
+                    }
+                }
+
+                unsigned int count = 0;
+                for (auto it1 = bestKContainer_[currResSet].rbegin(); it1 != bestKContainer_[currResSet].rend(); it1++) {
+                    keptResultsByLength[length]->push(*it1);
+                    count += 1;
+                    if (count >= maxResultPerResSet)
+                        break;
+                }
+            }
+            delete currBestK;
+        }
+
+        // save best from each subunit
+        keptResultsByLength[length]->setK(K_ + bestForSubunitId.size());
+        for (const auto &[subunitId, currBestK] : bestForSubunitId) {
+            keptResultsByLength[length]->push(*currBestK->rbegin());
+            delete currBestK;
+        }
+
+        printBestK(N_, keptResultsByLength[length]);
+    }
+
+    // output fully assembled results or largest subsets
+    if (keptResultsByLength[N_]->size() != 0) {
+        std::string outFileName = outFileNamePrefix + ".res";
+        std::ofstream outFile(outFileName);
+        std::ofstream outFileClustered(outFileNamePrefix + "_clustered.res");
+        BestK clusteredBestK(finalSizeLimit_); // TODO: this should also change on the best_k_by_id level
+
+        for (auto it = keptResultsByLength[N_]->rbegin(); it != keptResultsByLength[N_]->rend(); it++)
+            (*it)->fullReport(outFile);
+        // output after clustering
+        keptResultsByLength[N_]->cluster(clusteredBestK, 5.0, identGroups);
+        for (auto it = clusteredBestK.rbegin(); it != clusteredBestK.rend(); it++)
+            (*it)->fullReport(outFileClustered);
+        outFile.close();
+        outFileClustered.close();
+    } else {
+        // output largest subsets
+        for (unsigned int i = N_; i > 1; i--) {
+            if (keptResultsByLength[i]->size() == 0)
+                continue;
+            std::string outFileName = "cb_" + std::to_string(i) + " _" + outFileNamePrefix + ".res";
+            std::ofstream outFile(outFileName);
+            for (auto it = keptResultsByLength[i]->rbegin(); it != keptResultsByLength[i]->rend(); it++)
+                (*it)->fullReport(outFile);
+            outFile.close();
+            break;
+        }
+    }
+
+    // cleanup
+    for (const auto &[length, currBestK] : precomputedResults) {
+        delete currBestK;
+    }
+    for (const auto &[length, currBestK] : keptResultsByLength) {
+        delete currBestK;
+    }
+}
+
+void HierarchicalFold::tryToConnect(int id, const SuperBB &sbb1, const SuperBB &sbb2, BestK &results, bool toAdd,
+                                    std::promise<int> &output, std::vector<std::vector<unsigned int>> &identGroups) {
+    // iterate over pairs of BBs os SuperBB1 and SuperBB2
+    for (int i = 0; i < (int)sbb1.bbs_.size(); i++) {
+        int firstBB = sbb1.bbs_[i]->getID();
+        for (int j = 0; j < (int)sbb2.bbs_.size(); j++) {
+            int secondBB = sbb2.bbs_[j]->getID();
+
+            // loop over possible transformations between BBs
+            for (TransIterator2 it(sbb1, sbb2, firstBB, secondBB); !it.isAtEnd(); it++) {
+                // optimization - check that the score is not lower than the minimum in the current bestK
+                if((it.getScore() + sbb1.transScore_ + sbb2.transScore_) < results.minScore()){
+                    continue;
+                }
+
+                // discard any invalid transformations
+                bool filtered = filterTrans(sbb1, sbb2, it.transformation());
+                if (filtered)
+                    continue;
+
+                FoldStep step(firstBB, secondBB, it.getScore());
+                std::shared_ptr<SuperBB> theNew = createJoined(sbb1, sbb2, it.transformation(), 0, step, it.getScore());
+
+                if (theNew->getRestraintsRatio() < restraintsRatioThreshold_) {
+                    //            std::cout << "not enough restraints " << theNew->getRestraintsRatio() << " : " <<
+                    //            complexConst_.getDistanceRestraintsRatioThreshold();
+                    continue;
+                }
+
+                // results.push(theNew);
+                results.push_cluster(theNew, 1, identGroups);
+            }
+        }
+    }
+    output.set_value(1);
+}
+
+bool HierarchicalFold::filterTrans(const SuperBB &sbb1, const SuperBB &sbb2, const RigidTrans3 &trans) const {
+
+    // check distance constraints & restraints
+    for (unsigned int i = 0; i < sbb1.size_; i++) {
+        const BB &bb1 = *sbb1.bbs_[i];
+        RigidTrans3 t = (!sbb1.trans_[i]) * trans;
+        for (unsigned int j = 0; j < sbb2.size_; j++) {
+            const BB &bb2 = *sbb2.bbs_[j];
+            RigidTrans3 t2 = t * sbb2.trans_[j];
+            // check constraints first
+            if (!complexConst_.areConstraintsSatisfied(bb1.getID(), bb2.getID(), t2))
+                return true;
+        }
+    }
+
+    // backbone penetrations for each pair of BBs
+    for (unsigned int i = 0; i < sbb1.size_; i++) {
+        const BB &bb1 = *sbb1.bbs_[i];
+        RigidTrans3 t = (!sbb1.trans_[i]) * trans;
+
+        for (unsigned int j = 0; j < sbb2.size_; j++) {
+            const BB &bb2 = *sbb2.bbs_[j];
+            RigidTrans3 t2 = t * sbb2.trans_[j];
+
+            const BB *pBB1 = &bb1, *pBB2 = &bb2;
+            if (bb2.getSurfaceSize() > bb1.getSurfaceSize()) {
+                pBB1 = &bb2;
+                pBB2 = &bb1;
+                t2 = !t2;
+            }
+
+            countFilterTras_ = countFilterTras_ + 1;
+
+            // optimization - check if radiuses are too far apart and if so, skip check
+            if ((pBB1->getRadius() + pBB2->getRadius()) < (pBB1->getCM() - t2*pBB2->getCM()).norm()) {
+                countFilterTrasSkipped_ = countFilterTrasSkipped_ + 1;
+                continue;
+            }
+
+            unsigned int bbPenetrations = 0;
+            unsigned int totalUsedAtoms = 0;
+
+            // TODO: maybe should save Weighted bbPen using pBB1->grid_->getDist(v) as weight
+            for (Molecule<Atom>::const_iterator it = pBB2->caAtoms_.begin(); it != pBB2->caAtoms_.end(); it++) {
+                if (it->getTempFactor() < minTemperatureToConsiderCollision) {
+                    continue;
+                }
+                totalUsedAtoms++;
+
+                Vector3 v = t2 * it->position();
+                if (pBB1->getDistFromSurface(v) < 0) {
+                    // getResidueEntry(v) when used in BBGrid.h will return -1*res_index if res_index is backbone
+                    if (pBB1->grid_->getResidueEntry(v) < 0 && pBB1->grid_->getDist(v) < penetrationThreshold_) {
+                        int resEntry = pBB1->grid_->getResidueEntry(v) * -1;
+                        if (pBB1->getAtomByResId(resEntry).getTempFactor() < minTemperatureToConsiderCollision)
+                            continue;
+
+                        bbPenetrations++;
+                    }
+                }
+            }
+            float bbPenChangePercent = (float)(bbPenetrations) / (float)totalUsedAtoms;
+            if (bbPenChangePercent > maxBackboneCollisionPercentPerChain) {
+                return true;
+            }
+        }
+    }
+
+    return false;
+}
+
+void HierarchicalFold::createSymmetry(std::vector<std::shared_ptr<SuperBB>> identBBs, BestK &results) {
+    unsigned int transCount = 0;
+    std::cout << "started trans check, bb_size:" << identBBs.size() << std::endl;
+    for (TransIterator2 it(*identBBs[0], *identBBs[1], identBBs[0]->bbs_[0]->getID(), identBBs[1]->bbs_[0]->getID());
+         !it.isAtEnd(); it++)
+        transCount++;
+
+    std::cout << "number of transformations:" << transCount << std::endl;
+    unsigned int addedSymCount = 0;
+    for (unsigned int transNum = 0; transNum < transCount; transNum++) {
+        std::cout << "checking trans indexed" << transNum << std::endl;
+        // create symSBB for a trans, this is cumbersome because I don't really know how to handle transformations
+        std::shared_ptr<SuperBB> symSBB = identBBs[0];
+        for (unsigned int i = 1; i < identBBs.size(); i++) {
+            unsigned int count = -1;
+
+            // There is a memory issue here, I create TransIterator2 with symSBB as bb1, but then I override it
+            // and freeing the memory(?) of bb1_, so it is important to break after chanigng symSBB
+            for (TransIterator2 it(*symSBB, *identBBs[i], symSBB->bbs_[i - 1]->getID(), identBBs[i]->bbs_[0]->getID());
+                 !it.isAtEnd(); it++) {
+                count++;
+                if (count != transNum)
+                    continue;
+                float transScore = it.getScore() + it.getScore() * ((100 - it.getScore()) / 100);
+
+                FoldStep step(symSBB->bbs_[i - 1]->getID(), identBBs[i]->bbs_[0]->getID(), transScore);
+                std::cout << "adding trans " << it.transformation() << " **** " << it.getScore() << std::endl;
+                symSBB = createJoined(*symSBB, *identBBs[i], it.transformation(), 0, step, transScore);
+                break;
+            }
+        }
+        std::cout << "created possibly symSBB" << std::endl;
+
+        // check bb penetration between each 2 chains
+        double maxPenetration = 0;
+        bool shouldContinuePen = false;
+        for (unsigned int i = 0; i < symSBB->size_; i++) {
+            const BB &bb1 = *symSBB->bbs_[i];
+            RigidTrans3 t1 = (!symSBB->trans_[i]);
+            for (unsigned int j = i + 1; j < symSBB->size_; j++) {
+                const BB &bb2 = *symSBB->bbs_[j];
+                RigidTrans3 t2 = t1 * symSBB->trans_[j];
+
+                const BB *pBB1 = &bb1, *pBB2 = &bb2;
+                unsigned int totalUsedAtoms = 0;
+                unsigned int bbPenetrations = 0;
+
+                for (Molecule<Atom>::const_iterator it = pBB2->caAtoms_.begin(); it != pBB2->caAtoms_.end(); it++) {
+                    if (it->getTempFactor() < minTemperatureToConsiderCollision) {
+                        continue;
+                    }
+                    totalUsedAtoms++;
+
+                    Vector3 v = t2 * it->position();
+                    if (pBB1->getDistFromSurface(v) < 0) {
+                        // getResidueEntry(v) when used in BBGrid.h will return -1*res_index if res_index is backbone
+                        if (pBB1->grid_->getResidueEntry(v) < 0 && pBB1->grid_->getDist(v) < -1.0) {
+                            int resEntry = pBB1->grid_->getResidueEntry(v) * -1;
+                            if (pBB1->getAtomByResId(resEntry).getTempFactor() < minTemperatureToConsiderCollision)
+                                continue;
+                            bbPenetrations++;
+                        }
+                    }
+                }
+
+                if ((bbPenetrations / (1.0 * totalUsedAtoms)) > 0.2) {
+                    std::cout << "dropping " << identBBs.size() << " because penetration "
+                              << bbPenetrations / (1.0 * totalUsedAtoms) << std::endl;
+                    shouldContinuePen = true;
+                    break;
+                }
+
+                maxPenetration = std::max(maxPenetration, bbPenetrations / (1.0 * totalUsedAtoms));
+            }
+            if (shouldContinuePen)
+                break;
+        }
+        if (shouldContinuePen)
+            continue;
+        std::cout << "checked penetrations ratio max: " << maxPenetration << std::endl;
+        // if above some TH (for everything, not per chain) (20%) - drop
+
+        // if last and first centers are the farthest - drop
+        std::vector<Vector3> centroids;
+        for (unsigned int i = 0; i < symSBB->size_; i++) {
+            centroids.push_back(symSBB->trans_[i] * symSBB->bbs_[i]->getCM());
+        }
+        std::cout << "centroids distance " << (centroids[0] - centroids[1]).norm2() << " : "
+                  << (centroids[0] - centroids.back()).norm2() << std::endl;
+
+        float allowedDistFactor = 1.5 + (symSBB->size_ - 3) * 0.25;
+        if ((centroids[0] - centroids[1]).norm2() * allowedDistFactor < (centroids[0] - centroids.back()).norm2()) {
+            std::cout << "dropping " << identBBs.size() << " because centroids distance "
+                      << (centroids[0] - centroids[1]).norm2() << " : " << (centroids[0] - centroids.back()).norm2()
+                      << std::endl;
+            continue;
+        }
+
+        // verify that centroids are first all increasing distance from first centroid and then all decreasing distance
+        // from first centroid
+        bool increasing = true;
+        bool shouldContinue = false;
+        for (unsigned int i = 1; i < centroids.size(); i++) {
+            if (increasing) {
+                if ((centroids[i] - centroids[0]).norm2() < (centroids[i - 1] - centroids[0]).norm2()) {
+                    increasing = false;
+                }
+            } else {
+                if ((centroids[i] - centroids[0]).norm2() > (centroids[i - 1] - centroids[0]).norm2()) {
+                    std::cout << "dropping " << identBBs.size() << " because centroids not increasing and decreasing"
+                              << std::endl;
+                    shouldContinue = true;
+                    break;
+                }
+            }
+        }
+        if (shouldContinue)
+            continue;
+        if (increasing) {
+            std::cout << "dropping " << identBBs.size() << " because centroids only increasing " << std::endl;
+            continue;
+        }
+
+        std::cout << "added with score " << symSBB->weightedTransScore_ << std::endl;
+        results.push(symSBB);
+        addedSymCount++;
+    }
+
+    unsigned long groupIdentifier = 0;
+    for (unsigned int i = 0; i < identBBs.size(); i++) {
+        groupIdentifier += identBBs[i]->bbs_[0]->bitId();
+    }
+    std::cout << "Created " << addedSymCount << " Symmetrical for " << groupIdentifier << std::endl;
+}
+
+// utils
+std::shared_ptr<SuperBB> HierarchicalFold::createJoined(const SuperBB &sbb1, const SuperBB &sbb2, RigidTrans3 &trans,
+                                                        int bbPen, FoldStep &step, float transScore) const {
+    std::shared_ptr<SuperBB> theNew = std::make_shared<SuperBB>(sbb1);
+    theNew->join(trans, sbb2, bbPen, step, transScore);
+    theNew->setRestraintsRatio(complexConst_.getRestraintsRatio(theNew->bbs_, theNew->trans_));
+    return theNew;
+}
+
+std::shared_ptr<SuperBB> HierarchicalFold::getMatchingSBB(SuperBB sbb1, SuperBB sbb2,
+                                                          std::vector<std::vector<unsigned int>> &identGroups) {
+    std::map<unsigned int, unsigned int> bbIdToNewId;
+    for (std::vector<unsigned int> identGroup : identGroups) {
+        // verify sbb1 is fine (mostly for the initial structures)
+        bool flag = false;
+        int maxIdInSbb1 = -1;
+        for (unsigned int i = 0; i < identGroup.size(); i++) {
+            if (((1 << identGroup[i]) & sbb1.bitIds()) == 0) // ident_group[i] not in currResSet
+                flag = true;
+            else if (flag) {
+                if (sbb1.bbs_.size() != 1)
+                    std::cout << "sbb1 not valid " << sbb1.bitIds() << ":" << sbb2.bitIds() << std::endl;
+                return NULL;
+            } else {
+                maxIdInSbb1 = i;
+            }
+        }
+
+        // compute mapping from sbb2 bb ids to new bb ids
+        int maxIdInSbb2 = -1;
+        flag = false;
+        for (unsigned int i = 0; i < identGroup.size(); i++) {
+            if (((1 << identGroup[i]) & sbb2.bitIds()) == 0) // ident_group[i] not in currResSet
+                flag = true;
+            else if (flag) {
+                if (sbb2.bbs_.size() != 1)
+                    std::cout << "sbb2 not valid " << sbb1.bitIds() << ":" << sbb2.bitIds() << std::endl;
+                return NULL;
+            } else {
+                maxIdInSbb2 = i;
+            }
+        }
+
+        if (maxIdInSbb1 == -1 || maxIdInSbb2 == -1)
+            continue;
+
+        if ((maxIdInSbb1 + 1) + (maxIdInSbb2 + 1) > identGroup.size()) {
+            return NULL;
+        }
+
+        for (unsigned int i = 0; i < maxIdInSbb2 + 1; i++) {
+            bbIdToNewId[identGroup[i]] = identGroup[i + maxIdInSbb1 + 1];
+        }
+    }
+
+    // create new SuperBB with new ids
+    if (bbIdToNewId.size() == 0)
+        return std::make_shared<SuperBB>(sbb2);
+
+    // std::cout << "converting " << sbb1.bitIds() << ":" << sbb2.bitIds() << " with " << bbIdToNewId.size() <<
+    // std::endl;
+    std::shared_ptr<SuperBB> newSbb = std::make_shared<SuperBB>(sbb2);
+
+    for (auto iter = bbIdToNewId.rbegin(); iter != bbIdToNewId.rend(); ++iter) {
+        unsigned int oldId = iter->first;
+        unsigned int newId = iter->second;
+        newSbb->replaceIdentBB(1 << oldId, (*(bestKContainer_[1 << newId].begin()))->bbs_[0]);
+    }
+
+    return newSbb;
+}
 
 void HierarchicalFold::checkConnectivity() const {
     typedef boost::adjacency_list<boost::vecS,        // edge list
@@ -101,788 +720,4 @@ void HierarchicalFold::outputConnectivityGraph(std::string outFileName) const {
         }
     }
     outFile.close();
-}
-
-int get_available_concurrency() {
-    if (std::getenv("SLURM_CPUS_PER_TASK") != NULL)
-        return std::atoi(std::getenv("SLURM_CPUS_PER_TASK"));
-
-    return std::thread::hardware_concurrency();
-}
-
-unsigned nChoosek(unsigned int n, unsigned int k) {
-    if (k > n)
-        return 0;
-    if (k * 2 > n)
-        k = n - k;
-    if (k == 0)
-        return 1;
-
-    int result = n;
-    for (unsigned int i = 2; i <= k; ++i) {
-        result *= (n - i + 1);
-        result /= i;
-    }
-    return result;
-}
-
-bool isValidBasedOnIdent(std::vector<std::vector<unsigned int>> &identGroups, unsigned long currResSet) {
-    // Validating jobs will prevent running the same jobs for different ident (for example if A=B=C,D=E) we wouldn't
-    // need to check both AD and AE since they are the same so only AD will be valid.
-    // we will enable BE (but not AE/CE) so we can still have fold steps of AD+BE=ADBE
-    // we still have some repetition, for example we will create both AB and BC to enable later AD+BC
-
-    /*
-     * def is_valid(ident_groups, resSet):
-    ...:     baseline = 999
-    ...:     for ident_group in ident_groups:
-    ...:         for i in range(len(ident_group)):
-    ...:             if ident_group[i] in resSet:
-    ...:                 baseline = min(baseline, i)
-    ...:                 break
-    ...:     if baseline == 999:
-    ...:         return True
-    ...:     for ident_group in ident_groups:
-    ...:         flag = False
-    ...:         for i in range(baseline, len(ident_group)):
-    ...:             if ident_group[i] not in resSet:
-    ...:                 flag = True
-    ...:             elif flag:
-    ...:                 return False
-    ...:     return True
-    ...:
-     */
-    unsigned int baseline = 999;
-    for (std::vector<unsigned int> identGroup : identGroups) {
-        for (unsigned int i = 0; i < identGroup.size(); i++) {
-            if (((1 << identGroup[i]) & currResSet) != 0)
-                if (baseline > i)
-                    baseline = i;
-        }
-    }
-    if (baseline == 999)
-        return true;
-
-    for (std::vector<unsigned int> identGroup : identGroups) {
-        bool flag = false;
-        for (unsigned int i = baseline; i < identGroup.size(); i++) {
-            if (((1 << identGroup[i]) & currResSet) == 0) // ident_group[i] not in currResSet
-                flag = true;
-            else if (flag) {
-                // std::cout << "not valid " << currResSet << " based on " << i << std::endl;
-                return false;
-            }
-        }
-    }
-    return true;
-}
-
-void HierarchicalFold::createSymmetry(std::vector<std::shared_ptr<SuperBB>> identBBs, BestK &results) {
-    unsigned int transCount = 0;
-    std::cout << "started trans check, bb_size:" << identBBs.size() << std::endl;
-    for (TransIterator2 it(*identBBs[0], *identBBs[1], identBBs[0]->bbs_[0]->getID(), identBBs[1]->bbs_[0]->getID());
-         !it.isAtEnd(); it++)
-        transCount++;
-
-    std::cout << "number of transformations:" << transCount << std::endl;
-    unsigned int addedSymCount = 0;
-    for (unsigned int transNum = 0; transNum < transCount; transNum++) {
-        std::cout << "checking trans indexed" << transNum << std::endl;
-        // create symSBB for a trans, this is cumbersome because I don't really know how to handle transformations
-        std::shared_ptr<SuperBB> symSBB = identBBs[0];
-        for (unsigned int i = 1; i < identBBs.size(); i++) {
-            unsigned int count = -1;
-
-            // There is a memory issue here, I create TransIterator2 with symSBB as bb1, but then I override it 
-            // and freeing the memory(?) of bb1_, so it is important to break after chanigng symSBB
-            for (TransIterator2 it(*symSBB, *identBBs[i], symSBB->bbs_[i - 1]->getID(), identBBs[i]->bbs_[0]->getID());
-                 !it.isAtEnd(); it++) {
-                count++;
-                if (count != transNum)
-                    continue;
-                // float transScore = 95 + it.getScore() / 20;
-                // float transScore = it.getScore() + it.getScore() / 5;
-
-                // float transScore = std::min(it.getScore() + identBBs.size() * it.getScore() / 10, 95.0f) + it.getScore() / 20;
-                float transScore = it.getScore() + it.getScore() * ((100 - it.getScore()) / 100);
-                // float transScore = std::min(it.getScore() + it.getScore(), 95.0f) + it.getScore() / 20;
-
-
-
-                FoldStep step(symSBB->bbs_[i - 1]->getID(), identBBs[i]->bbs_[0]->getID(), transScore);
-                std::cout << "adding trans " << it.transformation() << " **** " << it.getScore() << std::endl;
-                // symSBB = createJoined(*symSBB, *identBBs[i], it.transformation(), 0, 0, 0, step, it.getScore());
-                symSBB = createJoined(*symSBB, *identBBs[i], it.transformation(), 0, step, transScore);
-                break;
-            }
-        }
-        std::cout << "created possibly symSBB" << std::endl;
-
-        // check bb penetration between each 2 chains
-        double maxPenetration = 0;
-        bool shouldContinuePen = false;
-        for (unsigned int i = 0; i < symSBB->size_; i++) {
-            const BB &bb1 = *symSBB->bbs_[i];
-            RigidTrans3 t1 = (!symSBB->trans_[i]);
-            for (unsigned int j = i + 1; j < symSBB->size_; j++) {
-                const BB &bb2 = *symSBB->bbs_[j];
-                RigidTrans3 t2 = t1 * symSBB->trans_[j];
-
-                const BB *pBB1 = &bb1, *pBB2 = &bb2;
-                unsigned int totalUsedAtoms = 0;
-                unsigned int bbPenetrations = 0;
-
-                for (Molecule<Atom>::const_iterator it = pBB2->caAtoms_.begin(); it != pBB2->caAtoms_.end(); it++) {
-                    if (it->getTempFactor() < minTemperatureToConsiderCollision) {
-                        continue;
-                    }
-                    totalUsedAtoms++;
-
-                    Vector3 v = t2 * it->position();
-                    if (pBB1->getDistFromSurface(v) < 0) {
-                        // getResidueEntry(v) when used in BBGrid.h will return -1*res_index if res_index is backbone
-                        if (pBB1->grid_->getResidueEntry(v) < 0 && pBB1->grid_->getDist(v) < -1.0) {
-                            int resEntry = pBB1->grid_->getResidueEntry(v) * -1;
-                            if (pBB1->getAtomByResId(resEntry).getTempFactor() < minTemperatureToConsiderCollision)
-                                continue;
-                            bbPenetrations++;
-                        }
-                    }
-                }
-
-                if ((bbPenetrations / (1.0 * totalUsedAtoms)) > 0.2) {
-                    std::cout << "dropping " << identBBs.size() << " because penetration "
-                            << bbPenetrations / (1.0 * totalUsedAtoms) << std::endl;
-                    shouldContinuePen = true;
-                    break;
-                }
-
-                maxPenetration = std::max(maxPenetration, bbPenetrations / (1.0 * totalUsedAtoms));
-            }
-            if (shouldContinuePen)
-                break;
-        }
-        if (shouldContinuePen)
-            continue;
-        std::cout << "checked penetrations ratio max: " << maxPenetration << std::endl;
-        // if above some TH (for everything, not per chain) (20%) - drop
-        
-
-        // if last and first centers are the farthest - drop
-        std::vector<Vector3> centroids;
-        for (unsigned int i = 0; i < symSBB->size_; i++) {
-            centroids.push_back(symSBB->trans_[i] * symSBB->bbs_[i]->getCM());
-        }
-        std::cout << "centroids distance " << (centroids[0] - centroids[1]).norm2() << " : "
-                  << (centroids[0] - centroids.back()).norm2() << std::endl;
-
-        float allowedDistFactor = 1.5 + (symSBB->size_ - 3) * 0.25;
-        if ((centroids[0] - centroids[1]).norm2() * allowedDistFactor < (centroids[0] - centroids.back()).norm2()) {
-            std::cout << "dropping " << identBBs.size() << " because centroids distance "
-                      << (centroids[0] - centroids[1]).norm2() << " : " << (centroids[0] - centroids.back()).norm2()
-                      << std::endl;
-            continue;
-        }
-
-        // verify that centroids are first all increasing distance from first centroid and then all decreasing distance
-        // from first centroid
-        bool increasing = true;
-        bool shouldContinue = false;
-        for (unsigned int i = 1; i < centroids.size(); i++) {
-            if (increasing) {
-                if ((centroids[i] - centroids[0]).norm2() < (centroids[i - 1] - centroids[0]).norm2()) {
-                    increasing = false;
-                }
-            } else {
-                if ((centroids[i] - centroids[0]).norm2() > (centroids[i - 1] - centroids[0]).norm2()) {
-                    std::cout << "dropping " << identBBs.size() << " because centroids not increasing and decreasing"
-                              << std::endl;
-                    shouldContinue = true;
-                    break;
-                }
-            }
-        }
-        if (shouldContinue)
-            continue;
-        if (increasing) {
-            std::cout << "dropping " << identBBs.size() << " because centroids only increasing " << std::endl;
-            continue;
-        }
-
-        std::cout << "added with score " << symSBB->weightedTransScore_ << std::endl;
-        results.push(symSBB);
-        addedSymCount++;
-    }
-
-    unsigned long groupIdentifier = 0;
-    for (unsigned int i = 0; i < identBBs.size(); i++) {
-        groupIdentifier += identBBs[i]->bbs_[0]->bitId();
-    }
-    std::cout << "Created " << addedSymCount << " Symmetrical for " << groupIdentifier << std::endl;
-}
-
-std::shared_ptr<SuperBB> HierarchicalFold::getMatchingSBB(SuperBB sbb1, SuperBB sbb2,
-                                                          std::vector<std::vector<unsigned int>> &identGroups) {
-    std::map<unsigned int, unsigned int> bbIdToNewId;
-    for (std::vector<unsigned int> identGroup : identGroups) {
-        // verify sbb1 is fine (mostly for the initial structures)
-        bool flag = false;
-        int maxIdInSbb1 = -1;
-        for (unsigned int i = 0; i < identGroup.size(); i++) {
-            if (((1 << identGroup[i]) & sbb1.bitIds()) == 0) // ident_group[i] not in currResSet
-                flag = true;
-            else if (flag) {
-                if (sbb1.bbs_.size() != 1)
-                    std::cout << "sbb1 not valid " << sbb1.bitIds() << ":" << sbb2.bitIds() << std::endl;
-                return NULL;
-            } else {
-                maxIdInSbb1 = i;
-            }
-        }
-
-        // compute mapping from sbb2 bb ids to new bb ids
-        int maxIdInSbb2 = -1;
-        flag = false;
-        for (unsigned int i = 0; i < identGroup.size(); i++) {
-            if (((1 << identGroup[i]) & sbb2.bitIds()) == 0) // ident_group[i] not in currResSet
-                flag = true;
-            else if (flag) {
-                if (sbb2.bbs_.size() != 1)
-                    std::cout << "sbb2 not valid " << sbb1.bitIds() << ":" << sbb2.bitIds() << std::endl;
-                return NULL;
-            } else {
-                maxIdInSbb2 = i;
-            }
-        }
-
-        if (maxIdInSbb1 == -1 || maxIdInSbb2 == -1)
-            continue;
-
-        if ((maxIdInSbb1 + 1) + (maxIdInSbb2 + 1) > identGroup.size()) {
-            // std::cout << "too big not valid " << sbb1.bitIds() << ":" << sbb2.bitIds() << std::endl;
-            return NULL;
-        }
-
-        for (unsigned int i = 0; i < maxIdInSbb2 + 1; i++) {
-            bbIdToNewId[identGroup[i]] = identGroup[i + maxIdInSbb1 + 1];
-        }
-    }
-
-    // create new SuperBB with new ids
-    if (bbIdToNewId.size() == 0)
-        return std::make_shared<SuperBB>(sbb2);
-
-    // std::cout << "converting " << sbb1.bitIds() << ":" << sbb2.bitIds() << " with " << bbIdToNewId.size() <<
-    // std::endl;
-    std::shared_ptr<SuperBB> newSbb = std::make_shared<SuperBB>(sbb2);
-
-    for (auto iter = bbIdToNewId.rbegin(); iter != bbIdToNewId.rend(); ++iter) {
-        unsigned int oldId = iter->first;
-        unsigned int newId = iter->second;
-        // std::shared_ptr<const BB> newBB = newBBAsSbb->bbs_[0];
-        newSbb->replaceIdentBB(1 << oldId, (*(bestKContainer_[1 << newId].begin()))->bbs_[0]);
-    }
-    // std::cout << "converted " << sbb2.bitIds() << "->" << newSbb->bitIds() << std::endl;
-
-    return newSbb;
-}
-
-bool isValidBasedOnAssembly(std::vector<std::vector<unsigned int>> &assemblyGroups, unsigned long currResSet) {
-    if (assemblyGroups.size() <= 1)
-        return true;
-    
-    bool seenPartialGroup = false;
-    int numberOfGroups = 0;
-
-    for (std::vector<unsigned int> assemblyGroup : assemblyGroups) {
-        bool seenZero = false;
-        bool seenOne = false;
-
-        for (unsigned long i = 0; i < assemblyGroup.size(); i++) {
-            if (((1 << assemblyGroup[i]) & currResSet) != 0)
-                seenOne = true;
-            else
-                seenZero = true;
-        }
-
-        if (seenOne)
-            numberOfGroups++;
-
-        if (seenZero && seenOne) {
-            seenPartialGroup = true;
-        }
-    }
-    if (numberOfGroups > 1 && seenPartialGroup)
-        return false;
-
-    return true;
-}
-
-void HierarchicalFold::fold(const std::string &outFileNamePrefix) {
-    // const size_t nthreads = get_available_concurrency();
-    // std::cout << "parallel (" << nthreads << " threads):" << std::endl;
-    // ctpl::thread_pool threadPool(nthreads);
-    bool output = false; // did we find something for N or N-1 subunits
-    std::string outFileName = outFileNamePrefix + ".res";
-    std::ofstream outFile(outFileName);
-    std::ofstream outFileClustered(outFileNamePrefix + "_clustered.res");
-
-    std::map<unsigned int, BestK *> keptResultsByLength;
-    keptResultsByLength[1] = new BestK(N_);
-
-    //  BestK* keptResults = new BestK(N_);
-    for (unsigned int i = 0; i < N_; i++) {
-        BestK &singleChainSBBS = bestKContainer_[1 << i];
-        if (singleChainSBBS.size() != 1) {
-            std::cerr << "started with " << singleChainSBBS.size() << " SBBs for " << (1 << i) << std::endl;
-        }
-
-        for (auto it1 = singleChainSBBS.begin(); it1 != singleChainSBBS.end(); it1++) {
-            keptResultsByLength[1]->push(*it1);
-            //          keptResults->push(*it1);
-        }
-        std::cout << "added to kept results chain " << i << std::endl;
-    }
-
-    // create ident chains
-    std::vector<bool> addedToGroup(N_, false);
-    std::vector<std::vector<unsigned int>> identGroups;
-    std::map<unsigned int, std::vector<unsigned int>> assemblyGroupsMap;
-    for (unsigned int i = 0; i < N_; i++) {
-        std::shared_ptr<SuperBB> sbbI = *(bestKContainer_[1 << i].begin());
-        const std::shared_ptr<const BB> bbI = sbbI->bbs_[0];
-        if(assemblyGroupsMap.count(bbI->groupId()) == 0) {
-            std::vector<unsigned int> newGroup;
-            assemblyGroupsMap[bbI->groupId()] = newGroup;
-        }
-        assemblyGroupsMap[bbI->groupId()].push_back(i);
-
-        if (addedToGroup[i])
-            continue;
-        addedToGroup[i] = true;
-        std::vector<unsigned int> identical;
-        
-        for (unsigned int j = i + 1; j < N_; j++) {
-            std::cout << "checking ident " << i << " & " << j << std::endl;
-            std::shared_ptr<SuperBB> sbbJ = *(bestKContainer_[1 << j].begin());
-
-            const std::shared_ptr<const BB> bbJ = sbbJ->bbs_[0];
-
-            if (bbI->isIdent(*bbJ)) {
-                addedToGroup[j] = true;
-                std::cout << "found ident " << i << " " << j << std::endl;
-                identical.push_back(j);
-            }
-        }
-        if (identical.size() > 0) {
-            identical.insert(identical.begin(), i);
-            identGroups.push_back(identical);
-        }
-    }
-    std::cout << "---- ident groups " << std::endl;
-    for (std::vector<unsigned int> identGroup : identGroups) {
-        std::cout << "ident group: ";
-        for (unsigned int i : identGroup) {
-            std::cout << i << " ";
-        }
-        std::cout << std::endl;
-    }
-
-    std::cout << "---- assembly groups " << std::endl;
-    std::vector<std::vector<unsigned int>> assemblyGroups;
-    for (const auto &[groupId, groupBBIds] : assemblyGroupsMap) {
-        std::cout << "assembly group " << groupId << ":";
-        for (unsigned int i : groupBBIds) {
-            std::cout << i << " ";
-        }
-        std::cout << std::endl;
-        assemblyGroups.push_back(groupBBIds);
-    }
-
-    // populate with homomers subunits
-    std::map<unsigned int, BestK *> precomputedResults;
-    for (unsigned int i = 2; i <= N_; i++)
-        precomputedResults[i] = new BestK(K_);
-
-    for (std::vector<unsigned int> identGroup : identGroups) {
-        for (unsigned int groupDivider = 1; identGroup.size() / groupDivider >= 5; groupDivider++) {
-            if ((identGroup.size() % groupDivider) != 0)
-                continue;
-            unsigned int groupSize = identGroup.size() / groupDivider;
-            // for (unsigned int i = 0; i < groupDivider; i++) {
-            //     std::vector<std::shared_ptr<SuperBB>> groupSBBs;
-            //     for (unsigned int j = 0; j < groupSize; j++) {
-            //         groupSBBs.push_back(*(clusteredSBBS_[1 << identGroup[i * groupSize + j]].begin()));
-            //     }
-            //     std::cout << "searching for size " << groupSBBs.size() << " has "
-            //               << precomputedResults.count(groupSBBs.size()) << std::endl;
-            //     createSymmetry(groupSBBs, *precomputedResults[groupSBBs.size()]);
-            // }
-            std::vector<std::shared_ptr<SuperBB>> groupSBBs;
-            for (unsigned int j = 0; j < groupSize; j++) {
-                groupSBBs.push_back(*(bestKContainer_[1 << identGroup[j]].begin()));
-            }
-            std::cout << "searching for size " << groupSBBs.size() << " has "
-                      << precomputedResults.count(groupSBBs.size()) << std::endl;
-            createSymmetry(groupSBBs, *precomputedResults[groupSBBs.size()]);
-        }
-    }
-
-    for (unsigned int length = 2; length <= N_; length++) { // # subunits iteration
-        std::cout << "*** running iteration " << length
-                  << " prev kept results: " << keptResultsByLength[length - 1]->size() << std::endl;
-        BestK *newKept = new BestK(K_);
-        std::map<unsigned long, BestK *> best_k_by_id;
-
-        for (auto it1 = precomputedResults[length]->begin(); it1 != precomputedResults[length]->end(); it1++) {
-            unsigned long currResSet = (**it1).bitIds();
-            if (best_k_by_id.count(currResSet) == 0)
-                best_k_by_id[currResSet] = new BestK(K_);
-            best_k_by_id[currResSet]->push(*it1);
-        }
-        for (unsigned int firstResultSize = 1; firstResultSize <= length / 2; firstResultSize++) {
-            unsigned int secondResultSize = length - firstResultSize;
-            std::cout << "** running sub-iteration " << firstResultSize << " " << secondResultSize << std::endl;
-            std::cout << "counters " << countFilterTrasSkipped_ << "/" << countFilterTras_ << std::endl;
-
-            for (auto it1 = keptResultsByLength[firstResultSize]->begin();
-                 it1 != keptResultsByLength[firstResultSize]->end(); it1++) {
-                SuperBB sbb1 = **it1;
-                unsigned long setA = sbb1.bitIds();
-
-                for (auto it2 = keptResultsByLength[secondResultSize]->begin();
-                     it2 != keptResultsByLength[secondResultSize]->end(); it2++) {
-
-                    if (firstResultSize == secondResultSize &&
-                        std::distance(keptResultsByLength[firstResultSize]->begin(), it1) >
-                            std::distance(keptResultsByLength[secondResultSize]->begin(), it2))
-                        continue; // Since those are 2 identical loops, don't do things twice
-
-                    std::shared_ptr<SuperBB> sbb2Pointer = getMatchingSBB(sbb1, **it2, identGroups);
-                    if (sbb2Pointer == NULL)
-                        continue;
-                    SuperBB sbb2 = *sbb2Pointer;
-
-                    unsigned long setB = sbb2.bitIds();
-                    if ((setA & setB) != 0)
-                        continue;
-                    unsigned long currResSet = setA | setB;
-                    if(!isValidBasedOnAssembly(assemblyGroups, currResSet)){
-                        std::cout << "invalid assembly " << currResSet << std::endl;
-                        continue;
-                    }
-
-                    // if ((setA & setB) != 0)
-                    //     continue;
-                    // if (!isValidBasedOnIdent(identGroups, currResSet))
-                    //     continue;
-
-                    if (best_k_by_id.count(currResSet) == 0)
-                        best_k_by_id[currResSet] = new BestK(K_);
-
-                    unsigned int resCountBefore = best_k_by_id[currResSet]->size();
-                    float minScoreBefore = best_k_by_id[currResSet]->minScore();
-
-                    std::promise<int> promise1;
-                    this->tryToConnect(1, sbb1, sbb2, *best_k_by_id[currResSet], (length < N_), promise1, identGroups);
-
-                    if (resCountBefore < best_k_by_id[currResSet]->size() ||
-                        minScoreBefore != best_k_by_id[currResSet]->minScore())
-                        std::cout << "found more for " << currResSet << " based on " << setA << " and " << setB
-                                  << " before: " << resCountBefore << " after: " << best_k_by_id[currResSet]->size()
-                                  << " scores " << best_k_by_id[currResSet]->minScore() << ":"
-                                  << best_k_by_id[currResSet]->maxScore() << std::endl;
-                }
-            }
-        }
-
-        std::map<unsigned long, BestK *> bestForSubunitId;
-        for (const auto &[currResSet, currBestK] : best_k_by_id) {
-            if (currBestK->size() > 0) {
-                BestK *clusteredBestK = bestKContainer_.newBestK(currResSet);
-
-                if (length == N_) { // output before clustering
-                    output = true;
-                    clusteredBestK->setK(finalSizeLimit_);
-                    for (auto it = currBestK->rbegin(); it != currBestK->rend(); it++) {
-                        (*it)->setRestraintsRatio(complexConst_.getRestraintsRatio((*it)->bbs_, (*it)->trans_));
-                        (*it)->fullReport(outFile);
-                    }
-                    // output after clustering
-                    currBestK->cluster(*clusteredBestK, 5.0, identGroups);
-                    for (auto it = clusteredBestK->rbegin(); it != clusteredBestK->rend(); it++) {
-                        (*it)->setRestraintsRatio(complexConst_.getRestraintsRatio((*it)->bbs_, (*it)->trans_));
-                        (*it)->fullReport(outFileClustered);
-                    }
-                } else {
-                    currBestK->cluster(*clusteredBestK, 1.0, identGroups);
-                    // for(auto it=currBestK->rbegin(); it != currBestK->rend(); it++)
-                    //     clusteredBestK->insert(*it);
-                }
-
-                std::cerr << "clustering resSet " << currResSet << " before: " << currBestK->size() << " after "
-                          << bestKContainer_[currResSet].size() << " scores " << bestKContainer_[currResSet].minScore()
-                          << ":" << bestKContainer_[currResSet].maxScore() << std::endl;
-
-                for (unsigned long i = 0; i < N_; i++) {
-                    if ((currResSet & (1 << i)) != 0) {
-                        if (bestForSubunitId.count(i) == 0) {
-                            bestForSubunitId[i] = new BestK(1);
-                        }
-                        bestForSubunitId[i]->push(*clusteredBestK->rbegin());
-                    }
-                }
-
-                unsigned int count = 0;
-                for (auto it1 = bestKContainer_[currResSet].rbegin(); it1 != bestKContainer_[currResSet].rend(); it1++) {
-                    newKept->push(*it1);
-                    count += 1;
-                    if (count >= maxResultPerResSet)
-                        break;
-                }
-            }
-            delete currBestK;
-        }
-
-        keptResultsByLength[length] = new BestK(K_ + bestForSubunitId.size());
-        for (auto it1 = newKept->begin(); it1 != newKept->end(); it1++) {
-            keptResultsByLength[length]->push(*it1);
-        }
-        delete newKept;
-        for (const auto &[subunitId, currBestK] : bestForSubunitId) {
-            keptResultsByLength[length]->push(*currBestK->rbegin());
-            delete currBestK;
-        }
-
-
-        // just for print
-        std::map<unsigned int, unsigned int> count_new_kept_by_bb;
-        std::map<unsigned int, unsigned int> count_new_kept_by_resSet;
-        for (unsigned int bit_index = 0; bit_index < N_; bit_index++)
-            count_new_kept_by_bb[bit_index] = 0;
-        for (auto it1 = keptResultsByLength[length]->begin(); it1 != keptResultsByLength[length]->end(); it1++) {
-            if (count_new_kept_by_resSet.count((**it1).bitIds()) == 0)
-                count_new_kept_by_resSet[(**it1).bitIds()] = 0;
-            count_new_kept_by_resSet[(**it1).bitIds()] += 1;
-            for (unsigned int bit_index = 0; bit_index < N_; bit_index++)
-                if (((**it1).bitIds() & (1 << bit_index)) > 0) {
-                    count_new_kept_by_bb[bit_index] += 1;
-                }
-        }
-
-        std::cout << "scores of saved " << keptResultsByLength[length]->minScore() << ":"
-                  << keptResultsByLength[length]->maxScore() << std::endl;
-        std::cout << "new kept results by chain ";
-        for (const auto &elem : count_new_kept_by_bb)
-            std::cout << elem.first << ":" << elem.second << ", ";
-        std::cout << std::endl << "new kept results by resSet ";
-        for (const auto &elem : count_new_kept_by_resSet)
-            std::cout << elem.first << ":" << elem.second << ", ";
-        std::cout << std::endl;
-    }
-
-    outFile.close();
-
-    if (!output)
-        outputSubsets();
-
-    for (const auto &[length, currBestK] : precomputedResults) {
-        delete currBestK;
-    }
-    for (const auto &[length, currBestK] : keptResultsByLength) {
-        delete currBestK;
-    }
-}
-
-void HierarchicalFold::outputSubsets() const {
-    bool found = false;
-    for (unsigned int length = N_ - 1; length > 2; length--) { // # subunits iteration
-
-        SubSet subsetGen(N_, length); // generates subsets of size length
-
-        do { // iterate subsets of length out of N
-            // unsigned long max = subsetGen.maxK() / 2;
-            unsigned long one = 1;
-            unsigned long currResSet = subsetGen.getSubset(one) | subsetGen.getComplementry(one);
-
-            if (!bestKContainer_.isEmpty(currResSet)) {
-                found = true;
-                std::string outFileName = "cb_" + std::to_string(length) + "_" + std::to_string(currResSet) + ".res";
-                std::cout << outFileName << " missing " << findMissingSubunits(currResSet) << std::endl;
-                std::ofstream oFile(outFileName);
-                for (auto it = bestKContainer_[currResSet].rbegin(); it != bestKContainer_[currResSet].rend(); it++) {
-                    (*it)->setRestraintsRatio(complexConst_.getRestraintsRatio((*it)->bbs_, (*it)->trans_));
-                    (*it)->fullReport(oFile);
-                }
-                oFile.close();
-            }
-
-        } while (subsetGen.increase()); // end subset iteration
-
-        if (found)
-            break;
-    }
-}
-
-std::string HierarchicalFold::findMissingSubunits(unsigned long currResSet) const {
-    std::string ret;
-    for (unsigned int suIndex = 0; suIndex < N_; suIndex++) {
-        unsigned long one = 1;
-        unsigned long set = one << suIndex;
-        if ((currResSet | set) != currResSet) {
-            std::shared_ptr<SuperBB> sbb = *(bestKContainer_[set].rbegin());
-            std::shared_ptr<const BB> bb = sbb->bbs_[0];
-            ret += bb->getPDBFileName();
-            ret += " ";
-        }
-    }
-    // std::cerr << "Can't find missing subunit " << currResSet << std::endl;
-    return ret;
-}
-
-void HierarchicalFold::tryToConnect(int id, const SuperBB &sbb1, const SuperBB &sbb2, BestK &results, bool toAdd,
-                                    std::promise<int> &output, std::vector<std::vector<unsigned int>> &identGroups) {
-
-    unsigned int totalCa = 0;
-    for (int i = 0; i < (int)sbb1.bbs_.size(); i++)
-        totalCa += sbb1.bbs_[i]->caAtoms_.size();
-    for (int i = 0; i < (int)sbb2.bbs_.size(); i++)
-        totalCa += sbb2.bbs_[i]->caAtoms_.size();
-
-    //  int backbonePenetrationThreshold = totalCa / 20;
-    //    int backbonePenetrationThreshold = (int) (0.01 * BB::backbonePenetrationMultiplierThreshold_ * totalCa);
-    int backbonePenetrationThreshold = (int)totalCa;
-
-    // iterate BBs os SuperBB1
-    for (int i = 0; i < (int)sbb1.bbs_.size(); i++) {
-        int firstBB = sbb1.bbs_[i]->getID();
-
-        // iterate BBs os SuperBB1
-        for (int j = 0; j < (int)sbb2.bbs_.size(); j++) {
-            int secondBB = sbb2.bbs_[j]->getID();
-            // if (!isValid(sbb1, sbb2, firstBB, secondBB)) continue;
-
-            // check backbone penetration
-            //      int bbPen = sbb1.backBonePen_ + sbb2.backBonePen_;
-            //      if (bbPen > backbonePenetrationThreshold){
-            //          std::cout << "filtered because joined bbPen" << std::endl;
-            //          continue;
-            //      }
-
-            // loop over possible transformations between BBs
-            for (TransIterator2 it(sbb1, sbb2, firstBB, secondBB); !it.isAtEnd(); it++) {
-                //        std::cout << "trans check started... ";
-
-                // check that the score is not lower than the minimum in the current bestK
-                if((it.getScore() + sbb1.transScore_ + sbb2.transScore_) < results.minScore()){
-                    continue;
-                }
-
-                int bbPen = sbb1.backBonePen_ + sbb2.backBonePen_;
-                // discard any invalid transformations
-                bool filtered = filterTrans(sbb1, sbb2, it.transformation(), bbPen,
-                                            backbonePenetrationThreshold, i, j);
-                if (filtered)
-                    continue;
-
-                FoldStep step(firstBB, secondBB, it.getScore());
-                std::shared_ptr<SuperBB> theNew =
-                    createJoined(sbb1, sbb2, it.transformation(), bbPen, step, it.getScore());
-
-                if (theNew->getRestraintsRatio() < restraintsRatioThreshold_) {
-                    //            std::cout << "not enough restraints " << theNew->getRestraintsRatio() << " : " <<
-                    //            complexConst_.getDistanceRestraintsRatioThreshold();
-                    continue;
-                }
-
-                // results.push(theNew);
-                results.push_cluster(theNew, 1, identGroups);
-            }
-        }
-    }
-    output.set_value(1);
-}
-
-std::shared_ptr<SuperBB> HierarchicalFold::createJoined(const SuperBB &sbb1, const SuperBB &sbb2, RigidTrans3 &trans,
-                                                        int bbPen, FoldStep &step, float transScore) const { 
-    std::shared_ptr<SuperBB> theNew = std::make_shared<SuperBB>(sbb1);
-    theNew->join(trans, sbb2, bbPen, step, transScore);
-    theNew->setRestraintsRatio(complexConst_.getRestraintsRatio(theNew->bbs_, theNew->trans_));
-    return theNew;
-}
-
-bool HierarchicalFold::filterTrans(const SuperBB &sbb1, const SuperBB &sbb2, const RigidTrans3 &trans,
-                                   int &bbPenetrations, int maxBBPenetrations, unsigned int sbb1Index, 
-                                   unsigned int sbb2Index) const {
-    
-    // check distance constraints & restraints
-    for (unsigned int i = 0; i < sbb1.size_; i++) {
-        const BB &bb1 = *sbb1.bbs_[i];
-        RigidTrans3 t = (!sbb1.trans_[i]) * trans;
-        for (unsigned int j = 0; j < sbb2.size_; j++) {
-            const BB &bb2 = *sbb2.bbs_[j];
-            RigidTrans3 t2 = t * sbb2.trans_[j];
-            // check constraints first
-            if (!complexConst_.areConstraintsSatisfied(bb1.getID(), bb2.getID(), t2))
-                return true;
-        }
-    }
-
-    // backbone penetrations
-    for (unsigned int i = 0; i < sbb1.size_; i++) {
-        const BB &bb1 = *sbb1.bbs_[i];
-        RigidTrans3 t = (!sbb1.trans_[i]) * trans;
-
-        for (unsigned int j = 0; j < sbb2.size_; j++) {
-            const BB &bb2 = *sbb2.bbs_[j];
-            RigidTrans3 t2 = t * sbb2.trans_[j];
-
-            const BB *pBB1 = &bb1, *pBB2 = &bb2;
-            if (bb2.getSurfaceSize() > bb1.getSurfaceSize()) {
-                pBB1 = &bb2;
-                pBB2 = &bb1;
-                t2 = !t2;
-            }
-
-            countFilterTras_ = countFilterTras_ + 1;
-            
-            // check if radiuses are too far apart
-            if ((pBB1->getRadius() + pBB2->getRadius()) < (pBB1->getCM() - t2*pBB2->getCM()).norm()) {
-                countFilterTrasSkipped_ = countFilterTrasSkipped_ + 1;
-                continue;
-            }
-
-
-            unsigned int bbPenetrationsBefore = bbPenetrations;
-
-            unsigned int totalUsedAtoms = 0;
-
-            // TODO: maybe should save Weighted bbPen using pBB1->grid_->getDist(v) as weight
-            for (Molecule<Atom>::const_iterator it = pBB2->caAtoms_.begin(); it != pBB2->caAtoms_.end(); it++) {
-                if (it->getTempFactor() < minTemperatureToConsiderCollision) {
-                    continue;
-                }
-                totalUsedAtoms++;
-
-                Vector3 v = t2 * it->position();
-                if (pBB1->getDistFromSurface(v) < 0) {
-                    // getResidueEntry(v) when used in BBGrid.h will return -1*res_index if res_index is backbone
-                    if (pBB1->grid_->getResidueEntry(v) < 0 && pBB1->grid_->getDist(v) < penetrationThreshold_) {
-                        int resEntry = pBB1->grid_->getResidueEntry(v) * -1;
-                        if (pBB1->getAtomByResId(resEntry).getTempFactor() < minTemperatureToConsiderCollision)
-                            continue;
-
-                        bbPenetrations++;
-                    }
-                }
-            }
-
-            float bbPenChangePercent = (float)(bbPenetrations - bbPenetrationsBefore) / (float)totalUsedAtoms;
-            if (bbPenChangePercent > maxBackboneCollisionPercentPerChain) {
-                return true;
-            }
-        }
-    }
-
-    return false;
 }

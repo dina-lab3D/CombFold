@@ -2,10 +2,8 @@
 #include "HierarchicalFold.h"
 
 
-SuperBB::SuperBB(std::shared_ptr<const BB> bb, unsigned int numberOfBBs)
-    : numberOfBBs_(numberOfBBs), backBonePen_(0), transScore_(0), weightedTransScore_(100) {
-
-    id_ = bb->id_;
+SuperBB::SuperBB(std::shared_ptr<const BB> bb)
+    : backBonePen_(0), transScore_(0), weightedTransScore_(100) {
     bbs_.push_back(bb);
     Vector3 v(0, 0, 0);
     Matrix3 M(1);
@@ -13,7 +11,6 @@ SuperBB::SuperBB(std::shared_ptr<const BB> bb, unsigned int numberOfBBs)
     trans_.push_back(T);
     size_ = 1;
     bitIDS_ = bb->bitId();
-    numOfAtoms_ = bb->numOfAtoms_;
 }
 
 float getWeightedTransScore(std::vector<FoldStep> steps, std::vector<std::shared_ptr<const BB>> bbs) {
@@ -80,18 +77,10 @@ void SuperBB::join(const RigidTrans3 &trans, const SuperBB &other, int bbPen, Fo
         bbs_.push_back(other.bbs_[j]);
         trans_.push_back(trans * other.trans_[j]);
     }
-    size1_ = size_;
-    size2_ = other.size_;
     size_ += other.size_;
-    child1_ = bitIDS_;
-    child2_ = other.bitIDS_;
     bitIDS_ |= other.bitIDS_;
-    id_ = std::min(other.id_, id_);
     backBonePen_ = bbPen;
 
-    int totalAtomNum = numOfAtoms_ + other.numOfAtoms_;
-
-    numOfAtoms_ = totalAtomNum;
     transScore_ += other.transScore_ + transScore;
 
     if (!other.foldSteps_.empty()) {
@@ -141,7 +130,7 @@ bool SuperBB::isPenetrating(const RigidTrans3 &trans, const SuperBB &other, floa
     return false;
 }
 
-// RMSD between two SBBs (assuming same BBs)
+// RMSD between two SBBs (assuming same BBs in each SBB)
 double SuperBB::calcRmsd(const SuperBB &other, std::vector<std::vector<unsigned int>> &identGroups) const {
     std::vector<std::vector<unsigned int>> presentIdentGroups;
 
@@ -258,67 +247,15 @@ double SuperBB::calcRmsd(const SuperBB &other, std::vector<std::vector<unsigned 
         match.add(i, i);
     }
     match.calculateBestFit(A, B);
-    // std::cerr << A.size() << " " << B.size() << " rmsd " <<  match.rmsd() << std::endl;
     return match.rmsd();
 }
 
 double SuperBB::calcRmsd(const SuperBB &other) const {
-    // calculate on CMs (centroids) first
-    Match cmMatch;
-    Molecule<Vector3> cmA, cmB;
-
-    // create transformed cmA and cmB mols
-    for (unsigned int i = 0; i < size_; i++) {
-        Vector3 a = trans_[i] * bbs_[i]->cm_;
-        cmA.add(a);
-
-        // look for the same BB in other
-        for (unsigned int j = 0; j < size_; j++) {
-            if (bbs_[i]->getID() == other.bbs_[j]->getID()) { // same BB
-                Vector3 b = other.trans_[j] * other.bbs_[j]->cm_;
-                cmB.add(b);
-                break;
-            }
-        }
-    }
-
-    for (unsigned int i = 0; i < size_; i++) {
-        cmMatch.add(i, i);
-    }
-    cmMatch.calculateBestFit(cmA, cmB);
-    if (cmMatch.rmsd() > 1.5)
-        return cmMatch.rmsd();
-
-    Match match;
-    Molecule<Atom> A, B;
-    // create transformed A and B mols
-    for (unsigned int i = 0; i < size_; i++) {
-        Molecule<Atom> mol = bbs_[i]->caAtoms_;
-        mol.rigidTrans(trans_[i]);
-        A.concat(mol);
-
-        // look for the same BB in other
-        for (unsigned int j = 0; j < size_; j++) {
-            if (bbs_[i]->getID() == other.bbs_[j]->getID()) { // same BB
-                Molecule<Atom> mol = other.bbs_[j]->caAtoms_;
-                mol.rigidTrans(other.trans_[j]);
-                B.concat(mol);
-                break;
-            }
-        }
-    }
-
-    for (unsigned int i = 0; i < A.size(); i++) {
-        match.add(i, i);
-    }
-    match.calculateBestFit(A, B);
-    // std::cerr << A.size() << " " << B.size() << " rmsd " <<  match.rmsd() << std::endl;
-    return match.rmsd();
+    std::vector<std::vector<unsigned int>> emptyIdentGroups;
+    return calcRmsd(other, emptyIdentGroups);
 }
 
 void SuperBB::fullReport(std::ostream &s) {
-    // HierarchalFold::timer_.stop();
-
     HierarchicalFold::countResults_++;
     RigidTrans3 tr;
     s << "size_ " << size_ << " transScore_ " << transScore_ << " multPen_ " << multPen_ << " singlePen_ " 
@@ -334,8 +271,6 @@ void SuperBB::fullReport(std::ostream &s) {
     s << "]  " << tr;
     FoldStep::outputFoldSteps(s, foldSteps_);
     s << std::endl;
-
-    // HierarchalFold::timer_.start();
 }
 
 std::ostream &operator<<(std::ostream &s, const SuperBB &sbb) {

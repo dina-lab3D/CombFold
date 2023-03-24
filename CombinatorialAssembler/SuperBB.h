@@ -1,13 +1,6 @@
 /**
- * \file SuperBB.h
- * \brief
- *
- * \authors Yuval Inbar, Dina Schneidman
- *
- *This class represents a SuperBB - A subunit of the final protein structure.Can be composed
- *of several smaller subunits.The imporant data members are bbs_ and trans_.
- *The important function is join(the larger one)
- *Comment written by Aharon Pritsker
+ * This class represents a SuperBB - A subcomplex composed by multiple subunits (saved in bbs_) and in certain
+ * transformations (saved in trans_)
  */
 #ifndef SUPERBB_H
 #define SUPERBB_H
@@ -21,45 +14,31 @@ class SuperBB {
     friend class HierarchicalFold;
     friend class TransIterator2;
 
-    SuperBB(std::shared_ptr<const BB> bb, unsigned int numberOfBBs);
-    // float calcScoreForTrans(Score &score, RigidTrans3 trans, SuperBB &other);
-    // This function takes Two super BBs and joins them
-    // trans - This is the transformation that joins the two super BBS together
-    // other - This is the second BB to be joined to this one
-    void join(const RigidTrans3 &trans, const SuperBB &other, int bbPen, FoldStep &step, float transScore);
-    // This function checks for collissions - Receives transformation and a second super BB and decides if
-    // they collide
-    bool isPenetrating(const RigidTrans3 &trans, const SuperBB &other, float threshold) const;
-    double calcRmsd(const SuperBB &other) const;
-    double calcRmsd(const SuperBB &other, std::vector<std::vector<unsigned int>> &identGroups) const;
-    void fullReport(std::ostream &s);
-    const FoldStep &lastFoldStep() const { return foldSteps_[size_ - 2]; }
-    bool isInChild1(unsigned int i) const { return (child1_ & (1 << i)); }
-    bool isInChild2(unsigned int i) const { return (child2_ & (1 << i)); }
-    int gap(int id);
-    float getRestraintsRatio() const { return restraintsRatio_; }
+    SuperBB(std::shared_ptr<const BB> bb);
 
     unsigned int bitIds() const { return bitIDS_; }
     unsigned int size() const { return size_; }
-    unsigned int size1() const { return size1_; }
-    unsigned int size2() const { return size2_; }
-
-    void replaceIdentBB(unsigned long oldBBBitId, std::shared_ptr<const BB> bb);
-
-    void setSize(unsigned int s) { size_ = s; }
+    float getRestraintsRatio() const { return restraintsRatio_; }
     void setRestraintsRatio(float r) { restraintsRatio_ = r; }
 
+    // This function takes Two super BBs and joins them using a transformation between to BBs
+    void join(const RigidTrans3 &trans, const SuperBB &other, int bbPen, FoldStep &step, float transScore);
+    void replaceIdentBB(unsigned long oldBBBitId, std::shared_ptr<const BB> bb);
+
+    // This function checks for collissions - Receives transformation and a second super BB and decides if
+    // they collide
+    bool isPenetrating(const RigidTrans3 &trans, const SuperBB &other, float threshold) const;
+    double calcRmsd(const SuperBB &other, std::vector<std::vector<unsigned int>> &identGroups) const;
+    double calcRmsd(const SuperBB &other) const;
+
+    void fullReport(std::ostream &s);
     friend std::ostream &operator<<(std::ostream &s, const SuperBB &sbb);
 
   private:
     // members
-    unsigned int size_, size1_, size2_;
-    unsigned int id_;
-    unsigned int numOfAtoms_;
+    unsigned int size_;
     std::vector<FoldStep> foldSteps_; // FoldStep is a transformation between two SUs
     unsigned int bitIDS_;
-    unsigned int child1_, child2_;
-    unsigned int numberOfBBs_;
     float restraintsRatio_;
 
   public: // TODO: Make private
@@ -107,12 +86,6 @@ class TransIterator2 {
     std::vector<std::shared_ptr<TransformationAndScore>>::const_iterator it_;
     RigidTrans3 mediatorTrans_;
     RigidTrans3 transformation_;
-};
-
-struct compRestraints {
-    bool operator()(const std::shared_ptr<SuperBB> &lhs, const std::shared_ptr<SuperBB> &rhs) const {
-        return lhs->getRestraintsRatio() < rhs->getRestraintsRatio();
-    }
 };
 
 #endif /* SUPERBB_H */
