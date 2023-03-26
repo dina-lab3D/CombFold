@@ -42,7 +42,7 @@ int main(int argc, char *argv[]) {
 <transNumToRead> <bestKeachStep> <constraintsFile>");
 
     // optional
-    desc.add_options()("help,h", "CombDock help")("version", "CombDock 2.0 2019")(
+    desc.add_options()("help,h", "Combinatoral Assembly help")("version", "CombFold 1.0 2022")(
         "penetrationThr,p", po::value<double>(&penetrationThr)->default_value(-1.0),
         "maximum allowed penetration between subunit surfaces (default = -1.0)")(
         "restraintsRatio,r", po::value<double>(&restraintsRatio)->default_value(0.7),
@@ -57,8 +57,8 @@ int main(int argc, char *argv[]) {
             "maxResultPerResSet,j", po::value<unsigned int>(&maxResultPerResSet)->default_value(0),
             "number of results saved for each calculated combination of subunits (default=k)")
 
-            ("outputFileNamePrefix,o", po::value<std::string>(&outFileNamePrefix)->default_value("combdock"),
-             "output file name, default name combdock.res");
+            ("outputFileNamePrefix,o", po::value<std::string>(&outFileNamePrefix)->default_value("output"),
+             "output file name, default name output.res");
 
     // required options: currently 5
     po::options_description hidden("Hidden options");
