@@ -25,9 +25,12 @@ INTERFACE_MIN_ATOM_DIST = 8.0
 
 # AF2TRANS_BIN_PATH = "/cs/labs/dina/bshor/repos/MyAF2mer2trans/AF2mer2trans"
 # COMB_ASSEMBLY_BIN_PATH = "/cs/labs/dina/bshor/repos/fastCombdock/CombDock.Linux"
-AF2TRANS_BIN_PATH = "/Users/benshor/Documents/Data/repos/CombFold/CombinatorialAssembler/AF2trans.out"
-COMB_ASSEMBLY_BIN_PATH = "/Users/benshor/Documents/Data/repos/CombFold/CombinatorialAssembler/CombinatorialAssembler.out"
+# AF2TRANS_BIN_PATH = "/Users/benshor/Documents/Data/repos/CombFold/CombinatorialAssembler/AF2trans.out"
+# COMB_ASSEMBLY_BIN_PATH = "/Users/benshor/Documents/Data/repos/CombFold/CombinatorialAssembler/CombinatorialAssembler.out"
 
+BINARY_PATH = os.path.abspath(os.path.join(BASE_PATH, "..", "CombinatorialAssembler"))
+AF2TRANS_BIN_PATH = os.path.join(BINARY_PATH, "AF2trans.out")
+COMB_ASSEMBLY_BIN_PATH = os.path.join(BINARY_PATH, "CombinatorialAssembler.out")
 
 @dataclasses.dataclass
 class PartialSubunit:
