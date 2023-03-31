@@ -571,9 +571,17 @@ std::shared_ptr<SuperBB> HierarchicalFold::createJoined(const SuperBB &sbb1, con
 
 std::shared_ptr<SuperBB> HierarchicalFold::getMatchingSBB(SuperBB sbb1, SuperBB sbb2,
                                                           std::vector<std::vector<unsigned int>> &identGroups) {
+    /*
+    This function recieves two SuperBBs and checks if they have common BBs that are a part of the same ident group.
+    If so, it checks wether the total amount of BBs from the same ident group is smaller than the size of the ident 
+    group. If so, It return a new SuperBB based on sbb2, but with the BBs from the ident group that are not in sbb1.
+    
+    It also validates that in both sbb1&sbb2, the BBs from the ident group are the smallest BBs in the ident group (This
+    prevents duplications of results). If they are not valid - returns NULL.
+    */
     std::map<unsigned int, unsigned int> bbIdToNewId;
     for (std::vector<unsigned int> identGroup : identGroups) {
-        // verify sbb1 is fine (mostly for the initial structures)
+        // verify sbb1 is valid (mostly needed to ignore initial structures of BBs that are not first in group) 
         bool flag = false;
         int maxIdInSbb1 = -1;
         for (unsigned int i = 0; i < identGroup.size(); i++) {
@@ -606,7 +614,8 @@ std::shared_ptr<SuperBB> HierarchicalFold::getMatchingSBB(SuperBB sbb1, SuperBB 
         if (maxIdInSbb1 == -1 || maxIdInSbb2 == -1)
             continue;
 
-        if ((maxIdInSbb1 + 1) + (maxIdInSbb2 + 1) > identGroup.size()) {
+        // check if there are more copies in sbb1 and sbb2 than the size of the ident group
+        if ((maxIdInSbb1 + 1) + (maxIdInSbb2 + 1) > identGroup.size()) { 
             return NULL;
         }
 
