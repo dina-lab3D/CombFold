@@ -299,7 +299,7 @@ void HierarchicalFold::fold(const std::string &outFileNamePrefix) {
         for (unsigned int i = N_; i > 1; i--) {
             if (keptResultsByLength[i]->size() == 0)
                 continue;
-            std::string outFileName = "cb_" + std::to_string(i) + " _" + outFileNamePrefix + ".res";
+            std::string outFileName = "cb_" + std::to_string(i) + "_" + outFileNamePrefix + ".res";
             std::ofstream outFile(outFileName);
             for (auto it = keptResultsByLength[i]->rbegin(); it != keptResultsByLength[i]->rend(); it++)
                 (*it)->fullReport(outFile);
