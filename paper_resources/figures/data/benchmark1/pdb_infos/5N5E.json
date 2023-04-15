@@ -1,0 +1,20 @@
+{
+  "A0": {
+    "name": "A0",
+    "chain_names": [
+      "C",
+      "D",
+      "H",
+      "J",
+      "K",
+      "P",
+      "Q",
+      "R",
+      "d",
+      "e"
+    ],
+    "start_res": 1,
+    "end_res": 99,
+    "sequence": "MGLSINPTLINRDKPYTKEELMEILRLAIIAELDAINLYEQMARYSEDENVRKILLDVAREEKAHVGEFMALLLNLDPEQVTELKGGFEEVKELTGIEA"
+  }
+}

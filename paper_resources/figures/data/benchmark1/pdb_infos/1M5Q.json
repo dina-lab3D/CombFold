@@ -1,0 +1,24 @@
+{
+  "10": {
+    "name": "10",
+    "chain_names": [
+      "A",
+      "B",
+      "C",
+      "D",
+      "E",
+      "F",
+      "G",
+      "H",
+      "I",
+      "J",
+      "K",
+      "L",
+      "M",
+      "N"
+    ],
+    "start_res": 1,
+    "end_res": 130,
+    "sequence": "FVAELNNLLGREVQVVLSNGEVYKGVLHAVDNQLNIVLANASNKAGEKFNRVFIMYRYIVHIDSTERRIDMREFAKQAEKIFPGMVKYIEETNVVLIGDKVRVSEIGVEGVGPVAERAKRLFEEFLKRYS"
+  }
+}

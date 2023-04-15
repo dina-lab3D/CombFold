@@ -1,0 +1,34 @@
+{
+  "A0": {
+    "name": "A0",
+    "chain_names": [
+      "A",
+      "B",
+      "C",
+      "D",
+      "E",
+      "F",
+      "G",
+      "H",
+      "I",
+      "J",
+      "K",
+      "L",
+      "M",
+      "N",
+      "O",
+      "P",
+      "Q",
+      "R",
+      "S",
+      "T",
+      "U",
+      "V",
+      "W",
+      "X"
+    ],
+    "start_res": 1,
+    "end_res": 197,
+    "sequence": "MEKREAQVARETGETKIEVRLSLDGTGVSDVKTGIGFLDHMLSALAKHGRFDLYLRCAGDLHVDDHHTSEDCAIVLGQAFRQAIGERKGIKRYGSAYAPLDESLARAVVDISSRPFAVIDLKLKREKIGELSCEMIPHVLHSFATSANLTLHVEVLYGANDHHKAESAFKATALALREAVTKDGPADAVPSTKGVLE"
+  }
+}

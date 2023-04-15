@@ -1,0 +1,30 @@
+{
+  "A0": {
+    "name": "A0",
+    "chain_names": [
+      "A",
+      "D",
+      "E",
+      "F",
+      "I",
+      "J",
+      "O",
+      "P"
+    ],
+    "start_res": 1,
+    "end_res": 124,
+    "sequence": "MNKTYAACPQNWIGVENKCFYFSEYPSNWTFAQAFCMAQEAQLARFDNQDELNFLMRYKANFDSWIGLHRESSEHPWKWTDNTEYNNTIPIRGEERFAYLNNNGISSTRIYSLRMWICSKLNAS"
+  },
+  "Q0": {
+    "name": "Q0",
+    "chain_names": [
+      "Q",
+      "S",
+      "U",
+      "X"
+    ],
+    "start_res": 1,
+    "end_res": 137,
+    "sequence": "TGSAKLECPQDWLSHRDKCFHVSQVSNTWKEGRIDCDKKGATLLLIQDQEELRFLLDSIKEKYNSFWIGLSYTLTDMNWKWINGTAFNSDVLKITGVTENGSCAAISGEKVTSEGCSSDNRWICQKELNGTHHHHHH"
+  }
+}
