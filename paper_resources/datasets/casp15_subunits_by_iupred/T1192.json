@@ -1,0 +1,20 @@
+{
+  "C0D0": {
+    "name": "C0D0",
+    "chain_names": [
+      "A",
+      "B",
+      "C",
+      "D",
+      "E",
+      "F",
+      "G",
+      "H",
+      "I",
+      "J"
+    ],
+    "start_res": 1,
+    "end_res": 190,
+    "sequence": "MSGTEEAILGGRDSHPAAGGGSVLCFGQCQYTAEEYQAIQKALRQRLGPEYISSRMAGGGQKVCYIEGHRVINLANEMFGYNGWAHSITQQNVDFVDLNNGKFYVGVCAFVRVQLKDGSYHEDVGYGVSEGLKSKALSLEKARKEAVTDGLKRALRSFGNALGNCILDKDYLRSLNKLPRQLPLEVDLTK"
+  }
+}
