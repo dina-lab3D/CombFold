@@ -27,6 +27,10 @@ def draw_scatter(name1, name2, x, y, output_path):
     plt.gca().spines['top'].set_visible(False)
     plt.gca().spines['right'].set_visible(False)
 
+    equation = f'$\\rho = {np.corrcoef(x, y)[0][1]:.2f}$'
+    plt.annotate(equation, xy=(0.05, 0.9), xycoords='axes fraction', fontsize=8,
+                 bbox=dict(boxstyle='square', facecolor='white', edgecolor="black", lw=0.5, pad=0.2))
+
     plt.savefig(output_path, bbox_inches='tight', dpi=300)
 
 
@@ -88,7 +92,7 @@ def main():
     print("CombFold able to assemble correctly (TM-score > 0.7) ", len([i for i in combfold_parsed_results.values()
                                                                         if max(i) > 0.7]))
 
-    # load MCTS results
+    # load MoLPC results
     mcts_results1_path = os.path.join(benchmark_path, "FD_all_trimer_mmscores.csv")
     mcts_results2_path = os.path.join(benchmark_path, "AFM_v2_all_trimer_mmscores.csv")
 
@@ -106,15 +110,15 @@ def main():
         if k in mcts_results2:
             mcts_results[k].append(mcts_results2[k])
 
-    print("MCTS able to assemble ", len(mcts_results))
-    print("MCTS able to assemble correctly (TM-score > 0.7) ", len([i for i in mcts_results.values()
+    print("MoLPC able to assemble ", len(mcts_results))
+    print("MoLPC able to assemble correctly (TM-score > 0.7) ", len([i for i in mcts_results.values()
                                                                     if max(i) > 0.7]))
 
-    # Fig 3A - bar graph - CombFold vs MCTS
-    name1, name2 = "CombFold", "MCTS"
+    # Fig 3A - bar graph - CombFold vs MoLPC
+    name1, name2 = "CombFold", "MoLPC"
     th_high, th_accept = 0.8, 0.7
     bar_width = 0.3
-    fig, ax = plt.subplots()
+    fig, ax = plt.subplots(figsize=(2.25, 1.75), dpi=600)
 
     labels = []
     for count, max_t in enumerate([1, 5, 10]):
@@ -129,14 +133,23 @@ def main():
         print(name1, max_t, res1_high, res1_acceptable)
         print(name2, max_t, res2_high, res2_acceptable)
 
+        # ax.bar(count, [res1_high / len(pdb_to_subunits)], color='#1f78b4', width=bar_width, edgecolor='grey',
+        #        label=f"{name1}\nHigh")
+        # ax.bar(count, [res1_acceptable / len(pdb_to_subunits)], color='#1f78b4', alpha=0.5, width=bar_width,
+        #        edgecolor='grey', bottom=[res1_high / len(pdb_to_subunits)], label=f"{name1}\nAcceptable")
+        # ax.bar(count + bar_width, [res2_high / len(pdb_to_subunits)], color='#ff7f00', width=bar_width, edgecolor='grey',
+        #        label=f"{name2}\nHigh")
+        # ax.bar(count + bar_width, [res2_acceptable / len(pdb_to_subunits)], color='#ff7f00', alpha=0.5, width=bar_width,
+        #        edgecolor='grey', bottom=[res2_high / len(pdb_to_subunits)], label=f"{name2}\nAcceptable")
         ax.bar(count, [res1_high / len(pdb_to_subunits)], color='#1f78b4', width=bar_width, edgecolor='grey',
-               label=f"{name1}\nHigh")
+               label=f"{name1} High")
         ax.bar(count, [res1_acceptable / len(pdb_to_subunits)], color='#1f78b4', alpha=0.5, width=bar_width,
-               edgecolor='grey', bottom=[res1_high / len(pdb_to_subunits)], label=f"{name1}\nAcceptable")
-        ax.bar(count + bar_width, [res2_high / len(pdb_to_subunits)], color='#ff7f00', width=bar_width, edgecolor='grey',
-               label=f"{name2}\nHigh")
+               edgecolor='grey', bottom=[res1_high / len(pdb_to_subunits)], label=f"{name1} Acceptable")
+        ax.bar(count + bar_width, [res2_high / len(pdb_to_subunits)], color='#ff7f00', width=bar_width,
+               edgecolor='grey',
+               label=f"{name2} High")
         ax.bar(count + bar_width, [res2_acceptable / len(pdb_to_subunits)], color='#ff7f00', alpha=0.5, width=bar_width,
-               edgecolor='grey', bottom=[res2_high / len(pdb_to_subunits)], label=f"{name2}\nAcceptable")
+               edgecolor='grey', bottom=[res2_high / len(pdb_to_subunits)], label=f"{name2} Acceptable")
 
     plt.ylabel('Success rate', fontsize=11)
     plt.xticks([i + bar_width / 2 for i in range(len(labels))], labels, fontsize=8)
@@ -148,10 +161,9 @@ def main():
         if label not in new_labels:
             new_labels.append(label)
             new_handles.append(handle)
-    ax.legend(new_handles, new_labels, bbox_to_anchor=(1, -0.2), loc='lower left', fontsize=8)
-
-    fig.set_size_inches(2, 1.5)
-    fig.set_dpi(300)
+    # ax.legend(new_handles, new_labels, bbox_to_anchor=(1, -0.2), loc='lower left', fontsize=8)
+    ax.legend(new_handles, new_labels, bbox_to_anchor=(1, -0.2), loc='lower left', fontsize=7, ncol=4,
+              handletextpad=0.2, columnspacing=0.25)
 
     plt.gca().spines['top'].set_visible(False)
     plt.gca().spines['right'].set_visible(False)
@@ -159,10 +171,10 @@ def main():
     plt.savefig(os.path.join(OUTPUT_FOLDER, "Fig3A.png"), bbox_inches='tight', dpi=300)
 
     # Fig 3B - Homomer vs. Hetromer
-    fig, ax = plt.subplots()
+    fig, ax = plt.subplots(figsize=(2.25, 1.75), dpi=600)
 
     homomers_count = len(homomers)
-    hetromers_count = len(pdb_to_subunits) - homomers_count
+    heteromers_count = len(pdb_to_subunits) - homomers_count
     MAX_T = 1
 
     results1 = [max(v[:MAX_T], default=0) for k, v in combfold_parsed_results.items() if k in homomers]
@@ -181,10 +193,10 @@ def main():
 
     results1 = [max(v[:MAX_T], default=0) for k, v in combfold_parsed_results.items() if k not in homomers]
     results2 = [max(v[:MAX_T], default=0) for k, v in mcts_results.items() if k not in homomers]
-    res1_high = len([i for i in results1 if i >= th_high]) / hetromers_count
-    res1_acceptable = len([i for i in results1 if th_high > i >= th_accept]) / hetromers_count
-    res2_high = len([i for i in results2 if i >= th_high]) / hetromers_count
-    res2_acceptable = len([i for i in results2 if th_high > i >= th_accept]) / hetromers_count
+    res1_high = len([i for i in results1 if i >= th_high]) / heteromers_count
+    res1_acceptable = len([i for i in results1 if th_high > i >= th_accept]) / heteromers_count
+    res2_high = len([i for i in results2 if i >= th_high]) / heteromers_count
+    res2_acceptable = len([i for i in results2 if th_high > i >= th_accept]) / heteromers_count
 
     ax.bar(1, [res1_high], color='#1f78b4', width=bar_width, edgecolor='grey', label=f"{name1} High")
     ax.bar(1, [res1_acceptable], color='#1f78b4', alpha=0.5, width=bar_width, edgecolor='grey', bottom=[res1_high],
@@ -194,13 +206,11 @@ def main():
            bottom=[res2_high], label=f"{name2} Acceptable")
 
     plt.ylabel('Success rate', fontsize=11)
-    plt.xticks([i + bar_width / 2 for i in range(2)], ["Homomers", "Hetromers"], fontsize=11)
+    plt.xticks([i + bar_width / 2 for i in range(2)], ["Homomers", "Heteromers"], fontsize=11)
 
     plt.gca().spines['top'].set_visible(False)
 
     plt.yticks(np.arange(0.1, 0.7, 0.1), fontsize=8)
-    fig.set_size_inches(2, 1.5)
-    fig.set_dpi(300)
 
     plt.gca().spines['right'].set_visible(False)
 
@@ -213,12 +223,12 @@ def main():
         our_tm_results.append(max(combfold_parsed_results.get(jobname, [])[:MAX_T], default=0))
         mcts_tm_results.append(max(mcts_results.get(jobname, [])[:MAX_T], default=0))
         if mcts_tm_results[-1] > 0.7 and our_tm_results[-1] < 0.7:
-            print(jobname, "better on MCTS", mcts_tm_results[-1], our_tm_results[-1])
+            print(jobname, "better on MoLPC", mcts_tm_results[-1], our_tm_results[-1])
 
     fig, ax = plt.subplots(figsize=(2.25, 1.75), dpi=600)
     ax.scatter(our_tm_results, mcts_tm_results, alpha=0.4, s=10, edgecolor='none')
     ax.set_xlabel("CombFold TM-score", fontsize=11)
-    ax.set_ylabel("MCTS TM-score", fontsize=11)
+    ax.set_ylabel("MoLPC TM-score", fontsize=11)
     plt.yticks(np.arange(0, 1.2, 0.2), fontsize=8)
     plt.xticks(np.arange(0, 1.2, 0.2), fontsize=8)
 
@@ -250,12 +260,12 @@ def main():
                               for subunit in pdb_to_subunits[jobname].values()))
         tm_results.append(max(combfold_parsed_results.get(jobname, [0])[:MAX_T]))
     print("complex length correlation:", np.corrcoef(res_counts, tm_results)[0][1])
-    draw_scatter("Number of complex amino acids", "TM-score", res_counts, tm_results,
+    draw_scatter("Number of amino acids", "TM-score", res_counts, tm_results,
                  os.path.join(OUTPUT_FOLDER, "Fig3E.png"))
 
     # Fig 3F - Weighted connectivity Ratio - TM-score
     tm_results = []
-    weighted_connectivity_ratio = []
+    pairwise_connectivity = []
     MAX_T = 10
 
     for jobname in sorted(pdb_to_subunits.keys()):
@@ -273,14 +283,14 @@ def main():
             if domain_name in connectivity_groups[0] \
                     and pairs_validation[jobname]["domains_scores"][domain_name]["rmsd"] < 10:
                 connected_count += res_num
-        weighted_connectivity_ratio.append(connected_count / total_count)
-        if weighted_connectivity_ratio[-1] >= 0.6 and tm_results[-1] < 0.7:
-            print("****", jobname, weighted_connectivity_ratio[-1], tm_results[-1])
-    print(np.corrcoef(weighted_connectivity_ratio, tm_results)[0][1])
-    print("probably possible", len([i for i in weighted_connectivity_ratio if i >= 0.6]))
-    draw_scatter("Weighted Connectivity Ratio", "TM-score", weighted_connectivity_ratio, tm_results,
+        pairwise_connectivity.append(connected_count / total_count)
+        if pairwise_connectivity[-1] >= 0.6 and tm_results[-1] < 0.7:
+            print("****", jobname, pairwise_connectivity[-1], tm_results[-1])
+    print(np.corrcoef(pairwise_connectivity, tm_results)[0][1])
+    print("probably possible", len([i for i in pairwise_connectivity if i >= 0.6]))
+    draw_scatter("Pairwise Connectivity", "TM-score", pairwise_connectivity, tm_results,
                  os.path.join(OUTPUT_FOLDER, "Fig3F.png"))
-    print("Weighted Connectivity correlation:", np.corrcoef(weighted_connectivity_ratio, tm_results)[0][1])
+    print("Pairwise Connectivity correlation:", np.corrcoef(pairwise_connectivity, tm_results)[0][1])
 
 
 if __name__ == "__main__":

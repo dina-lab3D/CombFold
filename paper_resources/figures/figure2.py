@@ -27,6 +27,10 @@ def draw_scatter(name1, name2, x, y, output_path):
     plt.gca().spines['top'].set_visible(False)
     plt.gca().spines['right'].set_visible(False)
 
+    equation = f'$\\rho = {np.corrcoef(x, y)[0][1]:.2f}$'
+    plt.annotate(equation, xy=(0.05, 0.9), xycoords='axes fraction', fontsize=8,
+                 bbox=dict(boxstyle='square', facecolor='white', edgecolor="black", lw=0.5, pad=0.2))
+
     plt.savefig(output_path, bbox_inches='tight', dpi=300)
 
 
@@ -113,14 +117,23 @@ def main():
         print(name1, max_t, res1_high, res1_acceptable)
         print(name2, max_t, res2_high, res2_acceptable)
 
+        # ax.bar(count, [res1_high / len(pdb_to_subunits)], color='#1f78b4', width=bar_width, edgecolor='grey',
+        #        label=f"{name1}\nHigh")
+        # ax.bar(count, [res1_acceptable / len(pdb_to_subunits)], color='#1f78b4', alpha=0.5, width=bar_width,
+        #        edgecolor='grey', bottom=[res1_high / len(pdb_to_subunits)], label=f"{name1}\nAcceptable")
+        # ax.bar(count + bar_width, [res2_high / len(pdb_to_subunits)], color='#ff7f00', width=bar_width, edgecolor='grey',
+        #        label=f"{name2}\nHigh")
+        # ax.bar(count + bar_width, [res2_acceptable / len(pdb_to_subunits)], color='#ff7f00', alpha=0.5, width=bar_width,
+        #        edgecolor='grey', bottom=[res2_high / len(pdb_to_subunits)], label=f"{name2}\nAcceptable")
         ax.bar(count, [res1_high / len(pdb_to_subunits)], color='#1f78b4', width=bar_width, edgecolor='grey',
-               label=f"{name1}\nHigh")
+               label=f"{name1} High")
         ax.bar(count, [res1_acceptable / len(pdb_to_subunits)], color='#1f78b4', alpha=0.5, width=bar_width,
-               edgecolor='grey', bottom=[res1_high / len(pdb_to_subunits)], label=f"{name1}\nAcceptable")
-        ax.bar(count + bar_width, [res2_high / len(pdb_to_subunits)], color='#ff7f00', width=bar_width, edgecolor='grey',
-               label=f"{name2}\nHigh")
+               edgecolor='grey', bottom=[res1_high / len(pdb_to_subunits)], label=f"{name1} Acceptable")
+        ax.bar(count + bar_width, [res2_high / len(pdb_to_subunits)], color='#ff7f00', width=bar_width,
+               edgecolor='grey',
+               label=f"{name2} High")
         ax.bar(count + bar_width, [res2_acceptable / len(pdb_to_subunits)], color='#ff7f00', alpha=0.5, width=bar_width,
-               edgecolor='grey', bottom=[res2_high / len(pdb_to_subunits)], label=f"{name2}\nAcceptable")
+               edgecolor='grey', bottom=[res2_high / len(pdb_to_subunits)], label=f"{name2} Acceptable")
 
     plt.ylabel('Success rate', fontsize=11)
     plt.xticks([i + bar_width / 2 for i in range(len(labels))], labels, fontsize=8)
@@ -132,8 +145,9 @@ def main():
         if label not in new_labels:
             new_labels.append(label)
             new_handles.append(handle)
-    ax.legend(new_handles, new_labels, bbox_to_anchor=(1, 0), loc='lower left',  fontsize=8, ncol=2)
-
+    ax.legend(new_handles, new_labels, bbox_to_anchor=(-0.35, -0.7), loc='lower left', fontsize=8, ncol=2,
+              handletextpad=0.2, columnspacing=0.25)
+    # ax.legend(new_handles, new_labels, bbox_to_anchor=(-0.4, 1.05), loc='lower left',  fontsize=6, ncol=2)
     fig.set_size_inches(2, 1.5)
     fig.set_dpi(300)
 
@@ -157,7 +171,7 @@ def main():
 
     # Fig 2C - Weighted connectivity Ratio - TM-score
     tm_results = []
-    weighted_connectivity_ratio = []
+    pairwise_connectivity = []
     MAX_T = 10
 
     for jobname in sorted(pdb_to_subunits.keys()):
@@ -175,14 +189,14 @@ def main():
             if domain_name in connectivity_groups[0] \
                     and pairs_validation[jobname]["domains_scores"][domain_name]["rmsd"] < 10:
                 connected_count += res_num
-        weighted_connectivity_ratio.append(connected_count / total_count)
-        if weighted_connectivity_ratio[-1] >= 0.6 and tm_results[-1] < 0.7:
-            print("****", jobname, weighted_connectivity_ratio[-1], tm_results[-1])
-    print(np.corrcoef(weighted_connectivity_ratio, tm_results)[0][1])
-    print("probably possible", len([i for i in weighted_connectivity_ratio if i >= 0.6]))
-    draw_scatter("Weighted Connectivity Ratio", "TM-score", weighted_connectivity_ratio, tm_results,
+        pairwise_connectivity.append(connected_count / total_count)
+        if pairwise_connectivity[-1] >= 0.6 and tm_results[-1] < 0.7:
+            print("****", jobname, pairwise_connectivity[-1], tm_results[-1])
+    print(np.corrcoef(pairwise_connectivity, tm_results)[0][1])
+    print("probably possible", len([i for i in pairwise_connectivity if i >= 0.6]))
+    draw_scatter("Pairwise Connectivity", "TM-score", pairwise_connectivity, tm_results,
                  os.path.join(OUTPUT_FOLDER, "Fig2C.png"))
-    print("Weighted Connectivity correlation:", np.corrcoef(weighted_connectivity_ratio, tm_results)[0][1])
+    print("Pairwise Connectivity correlation:", np.corrcoef(pairwise_connectivity, tm_results)[0][1])
 
     # Fig 2D - scatter plot - Combfold vs. AFMv2
     MAX_T = 1
