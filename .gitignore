@@ -34,3 +34,5 @@
 # Other
 .DS_Store
 CombinatorialAssembler/.vscode/*
+.idea/*
+paper_resources/figures/output

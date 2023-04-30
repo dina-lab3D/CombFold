@@ -15,7 +15,7 @@ def main():
 
     # load benchmark info
     pdb_to_subunits = {}
-    benchmark_path = os.path.join(DATA_PATH, "benchmark3")
+    benchmark_path = os.path.join(DATA_PATH, "benchmark2")
 
     for filename in os.listdir(os.path.join(benchmark_path, "pdb_infos")):
         jobname = filename.split(".")[0]

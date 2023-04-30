@@ -1,0 +1,32 @@
+{
+  "A0": {
+    "name": "A0",
+    "chain_names": [
+      "A",
+      "B",
+      "C",
+      "D",
+      "G",
+      "H",
+      "I",
+      "J"
+    ],
+    "start_res": 1,
+    "end_res": 273,
+    "sequence": "MRIGITYTVLRREEMAIKERAGEFGEVVMLHEDDLLFPGNYDLDVVIIRNVSHFKALYTARLFESEGIPTVNSSRLIFEAGDKLFATLRLAGKVPVPEWKAALSEGGALRVPDSLGYPLVSKPVFGSWGRLLAKVNDRDSLEAVLEHRKWMKNPLYGIHYFQEFVEKPGRDIRSYVIGGEFVGAIYRYSNHWITNTARGGKAEPCSDPEVEELSVKAWEAFGEGALAIDIFESEKGLLVNEVNPNMEFKNAARVTGADMAGKLVEYAVEVAKT"
+  },
+  "E0": {
+    "name": "E0",
+    "chain_names": [
+      "E",
+      "F",
+      "K",
+      "L",
+      "M",
+      "N"
+    ],
+    "start_res": 1,
+    "end_res": 53,
+    "sequence": "MVECPVCGSEIEIGEVELHQIVECPVCGAELEVVSLEPLTLEELPEVEEDWGE"
+  }
+}

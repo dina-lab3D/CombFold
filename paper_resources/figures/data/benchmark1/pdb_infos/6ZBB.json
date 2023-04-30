@@ -1,0 +1,99 @@
+{
+  "jF": {
+    "name": "jF",
+    "chain_names": [
+      "j"
+    ],
+    "start_res": 1,
+    "end_res": 60,
+    "sequence": "MLQSLIKKVWIPMKPYYTQAYQEIWVGTGLMAYIVYKIRSADKRSKALKASSAAPAHGHH"
+  },
+  "eF": {
+    "name": "eF",
+    "chain_names": [
+      "e"
+    ],
+    "start_res": 1,
+    "end_res": 70,
+    "sequence": "VPPVQVSPLIKLGRYSALFLGMAYGAKRYNYLKPRAEEERRLAAEEKKKRDEQKRIERELAEAQEDTILK"
+  },
+  "fF": {
+    "name": "fF",
+    "chain_names": [
+      "f"
+    ],
+    "start_res": 1,
+    "end_res": 87,
+    "sequence": "ASVVPLKEKKLLEVKLGELPSWILMRDFTPSGIAGAFQRGYYRYYNKYVNVKKGSIAGLSMVLAAYVFLNYCRSYKELKHERLRKYH"
+  },
+  "dF": {
+    "name": "dF",
+    "chain_names": [
+      "d"
+    ],
+    "start_res": 1,
+    "end_res": 160,
+    "sequence": "AGRKLALKTIDWVAFGEIIPRNQKAVANSLKSWNETLTSRLATLPEKPPAIDWAYYKANVAKAGLVDDFEKKFNALKVPIPEDKYTAQVDAEEKEDVKSCAEFLTQSKTRIQEYEKELEKMRNIIPFDQMTIEDLNEVFPETKLDKKKYPYWPHRPIETL"
+  },
+  "kF": {
+    "name": "kF",
+    "chain_names": [
+      "k"
+    ],
+    "start_res": 1,
+    "end_res": 57,
+    "sequence": "AGPEADAQFHFTGIKKYFNSYTLTGRMNCVLATYGSIALIVLYFKLRSKKTPAVKAT"
+  },
+  "8F": {
+    "name": "8F",
+    "chain_names": [
+      "8"
+    ],
+    "start_res": 1,
+    "end_res": 66,
+    "sequence": "MPQLDTSTWLTMILSMFLTLFIIFQLKVSKHNFYHNPELTPTKMLKQNTPWETKWTKIYLPLLLPL"
+  },
+  "bF": {
+    "name": "bF",
+    "chain_names": [
+      "b"
+    ],
+    "start_res": 1,
+    "end_res": 214,
+    "sequence": "PVPPLPEHGGKVRFGLIPEEFFQFLYPKTGVTGPYVLGTGLILYLLSKEIYVITPETFSAISTIGFLVYIVKKYGASVGEFADKLNEQKIAQLEEVKQASIKQIQDAIDMEKSQQALVQKRHYLFDVQRNNIAMALEVTYRERLHRVYREVKNRLDYHISVQNMMRQKEQEHMINWVEKRVVQSISAQQEKETIAKCIADLKLLSKKAQAQPVM"
+  },
+  "gF": {
+    "name": "gF",
+    "chain_names": [
+      "g"
+    ],
+    "start_res": 1,
+    "end_res": 102,
+    "sequence": "AEFVRNLAEKAPALVNAAVTYSKPRLATFWYYAKVELVPPTPAEIPTAIQSLKKIINSAKTGSFKQLTVKEALLNGLVATEVWMWFYVGEIIGKRGIIGYDV"
+  },
+  "aF": {
+    "name": "aF",
+    "chain_names": [
+      "a"
+    ],
+    "start_res": 1,
+    "end_res": 226,
+    "sequence": "MNENLFTSFITPVILGLPLVTLIVLFPSLLFPTSNRLVSNRFVTLQQWMLQLVSKQMMSIHNSKGQTWTLMLMSLILFIGSTNLLGLLPHSFTPTTQLSMNLGMAIPLWAGAVITGFRNKTKASLAHFLPQGTPTPLIPMLVIIETISLFIQPMALAVRLTANITAGHLLIHLIGGATLALMSISTTTALITFTILILLTILEFAVAMIQAYVFTLLVSLYLHDNT"
+  },
+  "KF": {
+    "name": "KF",
+    "chain_names": [
+      "K",
+      "L",
+      "M",
+      "N",
+      "O",
+      "P",
+      "Q",
+      "R"
+    ],
+    "start_res": 1,
+    "end_res": 75,
+    "sequence": "DIDTAAKFIGAGAATVGVAGSGAGIGTVFGSLIIGYARNPSLKQQLFSYAILGFALSEAMGLFCLMVAFLILFAM"
+  }
+}
