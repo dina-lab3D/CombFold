@@ -49,7 +49,7 @@ def main():
     ax.violinplot(data_to_plot, showmedians=True)
 
     ax.set_xticks([1, 2])
-    ax.set_xticklabels(["AFMv2", "AFMv3"])
+    ax.set_xticklabels(["AFMv2\n(Benchmark 1)", "AFMv3\n(Benchmark 2)"])
     plt.gca().spines['top'].set_visible(False)
     plt.gca().spines['right'].set_visible(False)
     plt.ylabel('DockQ', fontsize=11)
