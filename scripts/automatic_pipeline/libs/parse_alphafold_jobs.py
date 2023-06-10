@@ -4,11 +4,11 @@ import os
 from typing import Dict, List
 import numpy as np
 
-from configurable import get_scores_from_path
-from libs.get_alphafold_jobs import get_residue_diff
-from libs.utils_classes import PdbPath, AlphaFoldJobInfo, AFResultScoredPair, SubunitsInfo, SubunitPdbInfo, \
-    AFSubunitScores, AFInteractionScores
-from libs.utils_pdb import get_pdb_model_readonly, are_subunits_close_in_pdb, get_interface_res_ids
+from automatic_pipeline.configurable import get_scores_from_path
+from automatic_pipeline.libs.get_alphafold_jobs import get_residue_diff
+from automatic_pipeline.libs.utils_classes import PdbPath, AlphaFoldJobInfo, AFResultScoredPair, SubunitsInfo, \
+    SubunitPdbInfo, AFSubunitScores, AFInteractionScores
+from automatic_pipeline.libs.utils_pdb import get_pdb_model_readonly, are_subunits_close_in_pdb, get_interface_res_ids
 
 try:
     import ujson as json

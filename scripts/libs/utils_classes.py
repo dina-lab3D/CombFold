@@ -54,55 +54,11 @@ def save_subunits_info(subunits_info: SubunitsInfo, output_path: str):
 
 def read_subunits_info(output_path: str) -> SubunitsInfo:
     json_data = json.load(open(output_path))
-    # return {domain_name: SubunitInfo.from_dict(domain_info) for domain_name, domain_info in json_data.items()}
-    return {domain_name: SubunitInfo.from_dict({k: v for k, v in domain_info.items() if k != "end_res"})
-            for domain_name, domain_info in json_data.items()}
-
-
-@dataclasses.dataclass
-class AlphaFoldJobInfo:
-    subunit_names: List[SubunitName]
-    merged_subunits: List[bool]  # if True, then the subunit is merged with the next one
-    sequences: List[str]
-
-    def get_jobname(self):
-        return "_".join(self.subunit_names)
-
-    def get_as_fasta(self):
-        return f">{self.get_jobname()}\n" + ":".join(self.sequences) + "\n"
-
-    def __hash__(self):
-        return hash(tuple([*self.subunit_names, *self.merged_subunits]))
-
-
-class RunAlphaFoldResult(Enum):
-    SUCCESS = 0
-    NOT_STARTED = 1
-    RUNNING = 2
-    FAILED = 3
-    SHOULD_RERUN = 4
-
-
-@dataclasses.dataclass
-class AFSubunitScores:
-    plddt_avg: float
-    plddt_percentile: List[float]  # list of 11 numbers, 0-100 percentile in skips of 10
-    plddt_interface_avg: float
-    plddt_interface_percentile: List[float]  # list of 11 numbers, 0-100 percentile in skips of 10
-
-    self_pae_avg: float
-    self_pae_percentile: List[float]  # list of 11 numbers, 0-100 percentile in skips of 10
-
-
-@dataclasses.dataclass
-class AFInteractionScores:
-    pae_avg: float
-    pae_percentile: List[float]  # list of 11 numbers, 0-100 percentile in skips of 10
-    pae_joined_interface_avg: float
-    pae_joined_interface_percentile: List[float]  # list of 11 numbers, 0-100 percentile in skips of 10
-
-    interface1_size: int
-    interface2_size: int
+    subunits_info = {domain_name: SubunitInfo.from_dict({k: v for k, v in domain_info.items() if k != "end_res"})
+                     for domain_name, domain_info in json_data.items()}
+    for domain_name, domain_info in subunits_info.items():
+        assert domain_name == domain_info.name, "Domain name and domain info name must match"
+    return subunits_info
 
 
 @dataclasses.dataclass
@@ -111,18 +67,3 @@ class SubunitPdbInfo:
     chain_residue_id: int
     pdb_residue_id: int
     length: int
-
-
-@dataclasses.dataclass
-class AFResultScoredPair:
-    subunits_names: Tuple[SubunitName, SubunitName]
-    pdb_path: str
-
-    subunit1_pdb_info: SubunitPdbInfo
-    subunit2_pdb_info: SubunitPdbInfo
-
-    # chains_in_pdb: Tuple[ChainName, ChainName]
-
-    subunit1_scores: Optional[AFSubunitScores] = None
-    subunit2_scores: Optional[AFSubunitScores] = None
-    interaction_scores: Optional[AFInteractionScores] = None

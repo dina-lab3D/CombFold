@@ -1,7 +1,7 @@
 from typing import List, Dict, Tuple
 
-from configurable import run_alphafold_on_fasta
-from libs.utils_classes import AlphaFoldJobInfo, RunAlphaFoldResult
+from automatic_pipeline.configurable import run_alphafold_on_fasta
+from automatic_pipeline.libs.utils_classes import AlphaFoldJobInfo, RunAlphaFoldResult
 import os
 
 

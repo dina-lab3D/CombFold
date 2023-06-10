@@ -2,9 +2,9 @@ import os
 import shutil
 from typing import List, Dict, Tuple
 
-from configurable import AF2TRANS_BIN_PATH, is_bash_running, COMB_ASSEMBLY_BIN_PATH, run_bash_file
-from libs.utils_classes import AFResultScoredPair, SubunitsInfo, SubunitName
-from libs.utils_pdb import extract_pdb_info, copy_pdb_rename_chain, copy_pdb_set_start_offset
+from automatic_pipeline.configurable import AF2TRANS_BIN_PATH, is_bash_running, COMB_ASSEMBLY_BIN_PATH, run_bash_file
+from automatic_pipeline.libs.utils_classes import AFResultScoredPair, SubunitsInfo, SubunitName
+from automatic_pipeline.libs.utils_pdb import extract_pdb_info, copy_pdb_rename_chain, copy_pdb_set_start_offset
 
 
 def extract_ref_structs(af_scored_pairs: List[AFResultScoredPair], output_path: str, subunits_info: SubunitsInfo):

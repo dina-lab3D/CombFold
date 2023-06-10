@@ -1,8 +1,9 @@
 from collections import defaultdict
 from typing import List, Optional, Dict
 
-from configurable import MAX_AF_SIZE
-from libs.utils_classes import SubunitsInfo, AlphaFoldJobInfo, SubunitInfo, AFResultScoredPair, SubunitName
+from automatic_pipeline.configurable import MAX_AF_SIZE
+from automatic_pipeline.libs.utils_classes import SubunitsInfo, AlphaFoldJobInfo, SubunitInfo, AFResultScoredPair, \
+    SubunitName
 
 
 def get_residue_diff(subunit1: SubunitInfo, subunit2: SubunitInfo) -> int:

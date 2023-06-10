@@ -12,13 +12,12 @@ import Bio.SeqUtils
 import Bio.PDB, Bio.PDB.Residue
 
 from libs.prepare_complex import create_complexes
-from libs.utils_classes import read_subunits_info, SubunitName, SubunitsInfo
+from libs.utils_classes import read_subunits_info, SubunitName, SubunitsInfo, INTERFACE_MIN_ATOM_DIST
 from libs.utils_pdb import get_pdb_model_readonly, copy_pdb_set_start_offset, copy_pdb_rename_chain
 
 
 THIS_SCRIPT_PATH = os.path.abspath(__file__)
 BASE_PATH = os.path.dirname(THIS_SCRIPT_PATH)
-INTERFACE_MIN_ATOM_DIST = 8.0
 
 BINARY_PATH = os.path.abspath(os.path.join(BASE_PATH, "..", "CombinatorialAssembler"))
 AF2TRANS_BIN_PATH = os.path.join(BINARY_PATH, "AF2trans.out")
