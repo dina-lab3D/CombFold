@@ -48,6 +48,10 @@ bool BestK::push_cluster(std::shared_ptr<SuperBB> in, double rmsd, std::vector<s
 }
 
 void BestK::cluster(BestK &clusteredBest, double rmsd, std::vector<std::vector<unsigned int>> &identGroups) const {
+    cluster(clusteredBest, rmsd, identGroups, false);
+}
+
+void BestK::cluster(BestK &clusteredBest, double rmsd, std::vector<std::vector<unsigned int>> &identGroups, bool verbose) const {
     if (size() == 0)
         return;
     const std::shared_ptr<SuperBB> firstSBB = *rbegin();
@@ -65,6 +69,8 @@ void BestK::cluster(BestK &clusteredBest, double rmsd, std::vector<std::vector<u
             if (!clustered[i]) {
                 clustered[i] = true;
                 clusteredBest.insert(refSBB);
+                if (verbose)
+                    std::cout << "created new cluster " << i << std::endl;
             }
 
             // TODO: maybe shouldn't cluster more if already clustered (can lead to drift)
@@ -73,8 +79,12 @@ void BestK::cluster(BestK &clusteredBest, double rmsd, std::vector<std::vector<u
             int j = 0;
             // for(auto it2 = begin(); it2!= end(); it2++, j++) {
             for (auto it2 = rbegin(); it2 != rend(); it2++, j++) {
-                if (!clustered[j] && (*it2)->calcRmsd(*refSBB, identGroups) < rmsd) {
+                if (!clustered[j] && (*it2)->calcRmsd(*refSBB, identGroups, verbose) < rmsd) {
                     clustered[j] = true;
+                    if (verbose)
+                        std::cout << "clustering " << i << " to " << j << std::endl;
+                } else if (verbose && !clustered[j]) {
+                    std::cout << "not clustering " << i << " to " << j << std::endl;
                 }
             }
         }

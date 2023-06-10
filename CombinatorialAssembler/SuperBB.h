@@ -29,6 +29,11 @@ class SuperBB {
     // they collide
     bool isPenetrating(const RigidTrans3 &trans, const SuperBB &other, float threshold) const;
     double calcRmsd(const SuperBB &other, std::vector<std::vector<unsigned int>> &identGroups) const;
+    double calcRmsd(const SuperBB &other, std::vector<std::vector<unsigned int>> &identGroups, bool verbose) const;
+
+    double calcRmsdWithMap(const SuperBB &other, std::map<int, int> &bbIdMap) const;
+    double calcRmsdCentroidsWithMap(const SuperBB &other, std::map<int, int> &bbIdMap) const;
+
     double calcRmsd(const SuperBB &other) const;
 
     void fullReport(std::ostream &s);

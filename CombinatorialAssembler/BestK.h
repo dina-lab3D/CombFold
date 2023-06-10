@@ -44,6 +44,7 @@ class BestK : public std::multiset<std::shared_ptr<SuperBB>, comp> {
     bool push_cluster(std::shared_ptr<SuperBB> in, double rmsd, std::vector<std::vector<unsigned int>> &identGroups);
 
     void cluster(BestK &clusteredBest, double rmsd, std::vector<std::vector<unsigned int>> &identGroups) const;
+    void cluster(BestK &clusteredBest, double rmsd, std::vector<std::vector<unsigned int>> &identGroups, bool verbose) const;
     virtual ~BestK() {}
 
   private:

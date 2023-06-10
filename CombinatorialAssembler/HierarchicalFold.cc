@@ -289,7 +289,7 @@ void HierarchicalFold::fold(const std::string &outFileNamePrefix) {
         for (auto it = keptResultsByLength[N_]->rbegin(); it != keptResultsByLength[N_]->rend(); it++)
             (*it)->fullReport(outFile);
         // output after clustering
-        keptResultsByLength[N_]->cluster(clusteredBestK, 5.0, identGroups);
+        keptResultsByLength[N_]->cluster(clusteredBestK, 5.0, identGroups, true);
         for (auto it = clusteredBestK.rbegin(); it != clusteredBestK.rend(); it++)
             (*it)->fullReport(outFileClustered);
         outFile.close();
