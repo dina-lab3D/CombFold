@@ -1,27 +1,44 @@
 # CombFold
-The CombFold software tool is capable of combinatorially assembling multiple PDB models created by AlphaFold2-Multimer(AFM) into a single complex. 
-The software can run in two different ways, as follows:
-1. **Starting from PDBs**: The input for this mode of operation consists of subunit sequences and a folder containing PDBs of the subunits predicted by AFM. This mode of operation does not require a GPU and can also be executed entirely on Google Colab.
-2. **Starting from sequences**: The input for this mode of operation is only the subunit sequences. CombFold will first perform multiple AFM jobs (ColabFold installation is required), and only then will it proceed to the assembly. To use this mode of operation, the user will need to checkout the repository and modify the configurable.py file to suit their specific environment.
+The `CombFold` pipeline predicts the structure of large protein complexes starting from the sequences of chains in the complex (up to at least 18,000 amino acids and 32 subunits). 
+The pipeline uses AlphaFold-Multimer (AFM) to predict structures of "possible subcomplexes" which are combinations of subunits from the target complex. The **CombFold Combinatorial Assembly** algorithm assembles those structures into a single large complex.
 
-# System Requirements
-## Hardware requirements
+The pipeline has 4 stages:
+1. Defining subunits in the complex
+2. Predicting structures using AFM for all pairings of subunits
+3. \[Optional\] Predicting structures using AFM for larger groups of subunits
+4. Running the Combinatorial Assembly algorithm on all generated structures.
+
+
+## Demo
+
+To view a demonstration of inputs given to CombFold and a run of the assembly algorithm, use the Google Colab notebook provided at the following link: 
+
+https://colab.research.google.com/github/dina-lab3D/CombFold/blob/master/CombFold.ipynb. 
+
+This demo Colab notebook runs the assembly on the `example` folder in the repository. It should take ~10 minutes, including installation. The expected output can be found under `example/expected_assembled`.
+
+If you already have some AFM predictions for partial subcomplexes for some target complex, you can also use the Colab Notebook to run for your target complex without any local installation.
+
+
+# Installation
+## System Requirements
+### Hardware requirements
 For the combinatorial assembler, a standard computer with a standard CPU would suffice.
 
-To run the complete method starting from sequences, a GPU is recommended for running the ColabFold pipeline.
+For generating AlphaFold-Multimer predictions locally (which is likely required for heteromeric complexes), a GPU with at least 12GB of memory is recommended.
 
-## Software requirements
+### Software requirements
 The Combinatorial assembler is written in C++, while the supporting scripts required for running are written in Python3. Therefore, both a g++ compiler and a Python3 interpreter are required.
 
-### OS Requirements
+#### OS Requirements
 `CombFold` is supported for *macOS* and *Linux*. The code has been tested on the following systems:
 + macOS: Ventura (13.3.1)
 + Linux: Debian 10
 
-### C++ Dependencies 
+#### C++ Dependencies 
 The Combinatorial assembler depends on Boost which can be installed using:
 ```
-# For linux
+# For Linux
 sudo apt-get install libboost-all-dev
 
 # For MacOS
@@ -29,7 +46,7 @@ brew install boost
 ```
 In case boost is not in the compiler default include path, modify the BOOST_INCLUDE and BOOST_LIB variables on top of the Makefile for the installation destination.
 
-### Python Dependencies
+#### Python Dependencies
 The supporting scripts depend on these Python3 packages, which can be installed using pip:
 ```
 numpy
@@ -37,8 +54,7 @@ biopython
 scipy
 ```
 
-# Installation Guide (locally):
-(Not required if you plan to use the Colab notebook for assembly)
+## Installation Guide (locally):
 ```
 git clone https://github.com/dina-lab3D/CombFold.git
 cd CombinatorialAssembler
@@ -46,18 +62,11 @@ make
 ```
 Installation should take ~3 minutes
 
-# Running Assembly starting from PDBs
-In this use case, the user already has AlphaFold-Multimer PDB results for several different combinations of the subunits. For example for a complex with 27 chains (A9B9C9), there will be several PDBs with 2 chains (AA,AB,AC,BB,BC,CC) and optionally extended subcomplexes such as ABC,AAB,AABC, etc. The input for the combinatorial assembly will be those PDB files in addition to a `subunits.json` that defines the sequences of each **unique** subunit, along with the number of copies of this subunit. The assembly algorithm can run locally, or, after uploading all PDBs and `subunits.json` to Google Drive, run using Google Colab.
+# Running CombFold
+## Stage 1 - Defining subunits
+The first step is to divide the complex into subunits and create the `subunits.json` file that defines the complex. Subunits would not change their structure during the assembly (only their position relative to other subunits structures), so we would like to choose subunits that are a single structured domain.
 
-It should be noted that, unlike when starting from sequences, since scores JSON files produced by ColabFold are not required, instead of using PAE-based scoring an interface plDDT-based scoring is used.
-
-## Demo
-Using the Google Colab notebook provided at the following link: https://colab.research.google.com/github/dina-lab3D/CombFold/blob/master/CombFold.ipynb.
-This demo Colab notebook run the assembly on the `example` folder in the repository. It should take ~10 minutes, including installation. The expected output can be found under `example/assembled`.
-
-
-## Defining subunits
-The first step is to divide the complex into subunits. Naively, each subunit should simply be a complete chain in the complex. In case a chain is long, it is required to cut it into several subunits. This can be done either naively, by dividing the chain into same-length subunits, or by using predictors for functional domains based on sequence. Another option is to predict disordered regions based on sequence(for example using https://iupred3.elte.hu/) and remove them and split the sequence on these regions.
+**Naively, each subunit should simply be a complete chain in the complex**. In case a chain is long, it is required to cut it into several subunits. This can be done either naively, by dividing the chain into same-length subunits, or by using predictors for functional domains based on sequence. Another option is to predict disordered regions based on sequence(for example using https://iupred3.elte.hu/) and remove them and split the sequence on these regions.
 
 Subunit is defined by 4 fields:
 - name: a unique name for the subunit
@@ -74,21 +83,73 @@ for example:
   "sequence": "LTAAAQALDGLGDKFGRSIVDGNAILADVNPRMPQIRRDITGLANLGEVY"
 }
 ```
-which defines a subunit named AD1 with 50 amino acids (the sequence length) and that has 2 copies in the complex (chains labeled A and B). 
+which defines a subunit named AD1 with 50 amino acids (the sequence length) and that has 2 copies in the complex (chains labeled A and B).
 
+**Notice** that each unique sequence should appear in only a single subunit definition, which can be translated into multiple chains in the assembled complex, according to stochiometry.
 
-Notice that each unique sequence should appear in only a single subunit definition, which can be translated into multiple chains in the assembled complex, according to stochiometry.
+The `subunits.json` is a JSON dictionary of subunits, for example:
+```
+{
+  "A0": {"name": "A0", "chain_names": ["A", "B"], "start_res": 1, "sequence": "MKDILEKLEERRAQARLGGGEKRLEAQHKRGKLTARERIELLLDHGSFEE"},
+  "C0": {"name": "C0", "chain_names": ["C", "D"], "start_res": 1, "sequence": "MFDKILIANRGEIACRIIKTAQKMGIKTVAVYSDADRDAVHVAMADEAVH"},
+  "E0": {"name": "E0", "chain_names": ["E"], "start_res": 1, "sequence": "MGDKIESKKAAAAAEVSTVPGFLGVIESPEHAVTIADEIGYPVMIKASAGA"},
+  "E1": {"name": "E1", "chain_names": ["E"], "start_res": 51, "sequence": "GGGKGMRIAESADEVAEGFARAKSEASSSFGDDRVFVEKFITDPRHIEIQ"},
+}
+```
+This describes a complex with 5 chains (A,B,C,D,E), where A & B are the same chains (length 50) and so is C & D (length 50). Additionally, in this example, the chain E (length 100) is divided into two subunits. This can happen, for example, if the complete E would have been too large to be predicted with other subunits in our GPU.
 
-## Running the Combinatorial Assembly
+## Stage 2 - Predicting structures for pairs
+In this stage, we will run AFM for every pairing of subunits.
+
+Using the script from this repository:
+```
+python3 scripts/prepare_fastas.py subunits.json --stage pairs --output-fasta-folder <path_to_output_folder> --max-af-size 1800
+```
+will result in a folder with up to `((N+1)*N)/2` `.fasta` files. Each of these files can be used as an input for AFM.
+
+To run AFM you can use https://github.com/sokrypton/ColabFold to run using a Colab Notebook or https://github.com/YoshitakaMo/localcolabfold to run locally (which will require a GPU). 
+
+Notice that the number of AFM predictions required is dependent on the number of subunits (*unique* chains in the complex). Therefore, a homooligomer with 10 chains, will only require a single AFM prediction. Therefore, for complexes with many copies of the same chain, perhaps using a Colab Notebook can suffice. 
+
+Notice that the command line defines `--max-af-size` which should be set to the maximal number of residues that can be predicted using your prediction environment (local GPU or GPU supplied by Google Colab.
+
+If running ColabFold locally, you can use a command line similar to this for each fasta path:
+```
+colabfold_batch <fasta_path> <output_folder> --num-models 5
+```
+
+## Stage 3 - \[Optional\] Predicting structures for larger groups
+In this stage, we will run AFM for larger groups of subunits (up to 6 subunits at a single prediction). To limit the number of required predictions, we will choose only larger groups that are more likely to give high-scored results, based on the scores of predictions of pairs. 
+
+This stage is optional, as the assembly can be done using only the pairs predictions, however, this stage significantly improves the accuracy of generated results and the ability to assemble challenging complexes.
+
+Using the same script, we will generate a folder with `.fasta` files of larger groups:
+```
+python3 scripts/prepare_fastas.py subunits.json  --stage groups --output-fasta-folder <path_to_output_folder>--max-af-size 1800 --input-pairs-results <path_to_AFM_pairs_results>
+```
+
+Here you will also need to supply path_to_AFM_pairs_results which will be a folder containing all `.pdb` files that were predicted by AFM in the previous stage.
+
+The generated `.fasta` are to be supplied to AFM as input, as done in the previous stage.
+
+## Stage 4 - Combinatorial Assembly
+In this use stage, the user already has AlphaFold-Multimer PDB predictions for several different combinations of the subunits. For example for a complex with 27 chains (A9B9C9), there will be all PDBs with 2 chains (AA,AB,AC,BB,BC,CC) and optionally extended subcomplexes such as ABC,AAB,AABC, etc. The input for the combinatorial assembly will be those PDB files in addition to the `subunits.json`.
+
+The assembly can run either locally or in a Google Colab Notebook.
+
+### Using Google Colab
+By using the Demo Colab notebook, the user just need to create the input data for their complex in a folder in their Google Drive. That is a folder containing the file `subunits.json` and a folder named `pdbs` that contains all PDB files generated by AFM in the previous stages. 
+
+To run the algorithm use the Demo Notebook:
+
+https://colab.research.google.com/github/dina-lab3D/CombFold/blob/master/CombFold.ipynb
+
+After installing the necessary dependencies by running the first cell of the notebook (and ignoring the `view example elements` cell), the user must locate the input data folder on their Google Drive using the `Files` toolbar on the left of the Colab notebook. The user must then copy the path and enter it into the `Run` cell and run it. Running this cell will generate the assembled complexes (in a PDB or CIF format), which will be saved to the base input folder (containing `subunits.json` under a new folder named "assembled". 
+
 ### Using local installation
 By running `scripts/run_on_pdbs.py`:
 ```
 python3 scripts/run_on_pdbs.py <path_to_subunits.json> <path_to_folder_of_pdbs> <path_to_empty_output_folder>
 ```
-
-### Using Google Colab
-By using the Demo Colab notebook, the user just need to create the input data for the thier complex in a folder in thier Google Drive. That is a folder with a file named `subunits.json` and a folder named `pdbs` that contains all PDB files. 
-
-After installing the necessary dependencies by running the first cell of the notebook (and ignoring the `view example elements` cell), the user must locate the input data folder on their Google Drive using the `Files` toolbar on the left of the Colab notebook. The user must then copy the path and enter it into the `Run` cell and run it. Running this cell will generate the assembled complexes (in a PDB format), which will be saved to the base input folder under a new folder named "assembled". 
 
 
