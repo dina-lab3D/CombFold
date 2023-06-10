@@ -18,20 +18,15 @@ from libs.utils_pdb import get_pdb_model_readonly, copy_pdb_set_start_offset, co
 
 THIS_SCRIPT_PATH = os.path.abspath(__file__)
 BASE_PATH = os.path.dirname(THIS_SCRIPT_PATH)
-SUBUNITS_INFO_PATH = os.path.join(BASE_PATH, "subunits_info")
-MAIN_OUTPUT_PATH = os.path.join(BASE_PATH, "output")
-
 INTERFACE_MIN_ATOM_DIST = 8.0
-
-# AF2TRANS_BIN_PATH = "/cs/labs/dina/bshor/repos/MyAF2mer2trans/AF2mer2trans"
-# COMB_ASSEMBLY_BIN_PATH = "/cs/labs/dina/bshor/repos/fastCombdock/CombDock.Linux"
-# AF2TRANS_BIN_PATH = "/Users/benshor/Documents/Data/repos/CombFold/CombinatorialAssembler/AF2trans.out"
-# COMB_ASSEMBLY_BIN_PATH = "/Users/benshor/Documents/Data/repos/CombFold/CombinatorialAssembler/CombinatorialAssembler.out"
 
 BINARY_PATH = os.path.abspath(os.path.join(BASE_PATH, "..", "CombinatorialAssembler"))
 AF2TRANS_BIN_PATH = os.path.join(BINARY_PATH, "AF2trans.out")
 COMB_ASSEMBLY_BIN_PATH = os.path.join(BINARY_PATH, "CombinatorialAssembler.out")
 
+
+# In most cases PartialSubunit will be the complete subunit, but this allows to input PDBs of interactions with only the
+# interfaces between subunits.
 @dataclasses.dataclass
 class PartialSubunit:
     subunit_name: str
@@ -47,7 +42,7 @@ class TransformationInfo:
     subunit_names: Tuple[str, str]
     pdb_path: str
     pdb_chain_ids: Tuple[str, str]
-    ref_imposed_rmsds: Tuple[float, float]
+    rep_imposed_rmsds: Tuple[float, float]
     transformation_numbers: str
     score: float
 
@@ -91,15 +86,15 @@ def extract_partial_from_representative(partial_subunit: PartialSubunit, represe
         return output_pdb_path
 
     chain_name, ident_subunit_name = subunit_info.chain_names[0], subunit_info.get_chained_names()[0]
-    ref_subunit_path = os.path.join(representative_subunits_path, f"{ident_subunit_name}.pdb")
+    rep_subunit_path = os.path.join(representative_subunits_path, f"{ident_subunit_name}.pdb")
 
-    ref_partial_subunit = PartialSubunit(subunit_name=subunit_info.name,
-                                         pdb_path=ref_subunit_path,
+    rep_partial_subunit = PartialSubunit(subunit_name=subunit_info.name,
+                                         pdb_path=rep_subunit_path,
                                          chain_id=chain_name,
                                          start_residue_id=start_res_id,
                                          end_residue_id=end_res_id,
                                          subunit_start_sequence_id=0)  # subunit_start_sequence_id is ignored
-    extract_partial_subunit(ref_partial_subunit, output_pdb_path)
+    extract_partial_subunit(rep_partial_subunit, output_pdb_path)
     return output_pdb_path
 
 
@@ -119,7 +114,8 @@ def score_transformation(pdb_path1: str, pdb_path2: str) -> Optional[float]:
 
     close_residues = np.argwhere(scipy.spatial.distance.cdist(chain1_ca, chain2_ca) < INTERFACE_MIN_ATOM_DIST)
     if len(close_residues) == 0:
-        print("no interface between", os.path.basename(pdb_path1), os.path.basename(pdb_path2))
+        print("Skipping transformation, missing interface between",
+              os.path.basename(pdb_path1)[8:-4], os.path.basename(pdb_path2)[8:-4])
         return None
 
     chain1_interface, chain2_interface = set(), set()
@@ -135,9 +131,9 @@ def score_transformation(pdb_path1: str, pdb_path2: str) -> Optional[float]:
 def get_transformation_from_partials(partial_subunit1: PartialSubunit, partial_subunit2: PartialSubunit,
                                      representative_subunits_path: str, temp_folder: str,
                                      subunits_info: SubunitsInfo) -> Optional[TransformationInfo]:
-    ref_struct1_path = extract_partial_from_representative(partial_subunit1, representative_subunits_path,
+    rep_struct1_path = extract_partial_from_representative(partial_subunit1, representative_subunits_path,
                                                            temp_folder, subunits_info)
-    ref_struct2_path = extract_partial_from_representative(partial_subunit2, representative_subunits_path,
+    rep_struct2_path = extract_partial_from_representative(partial_subunit2, representative_subunits_path,
                                                            temp_folder, subunits_info)
 
     sample_struct1_path = os.path.join(temp_folder, f"sample1_{partial_subunit1.subunit_name}.pdb")
@@ -150,19 +146,19 @@ def get_transformation_from_partials(partial_subunit1: PartialSubunit, partial_s
     if score is None:
         return None
 
-    af2trans_output = subprocess.check_output([AF2TRANS_BIN_PATH, ref_struct1_path, ref_struct2_path,
+    af2trans_output = subprocess.check_output([AF2TRANS_BIN_PATH, rep_struct1_path, rep_struct2_path,
                                                sample_struct1_path, sample_struct2_path]).decode()
     assert af2trans_output.count(" | ") == 3, f"Unexpected output from AF2mer2trans {af2trans_output}"
 
     _, su1_desc, su2_desc, trans_nums = af2trans_output.split(" | ")
-    ref_imposed_rmsds = (float(su1_desc.split("_")[0]), float(su2_desc.split("_")[0]))
+    rep_imposed_rmsds = (float(su1_desc.split("_")[0]), float(su2_desc.split("_")[0]))
 
     return TransformationInfo(
         subunit_names=(partial_subunit1.subunit_name, partial_subunit2.subunit_name),
         pdb_path=partial_subunit1.pdb_path,
         pdb_chain_ids=(partial_subunit1.chain_id, partial_subunit2.chain_id),
         transformation_numbers=trans_nums,
-        ref_imposed_rmsds=ref_imposed_rmsds,
+        rep_imposed_rmsds=rep_imposed_rmsds,
         score=score
     )
 
@@ -243,7 +239,7 @@ def get_pdb_to_partial_subunits(pdbs_folder: str, subunits_info: SubunitsInfo) -
                                                                    end_residue_id=end_res_id,
                                                                    subunit_start_sequence_id=subunit_start_sequence_id))
 
-        print(f"found {len(partial_subunits)} partial subunits in {pdb_filename}")
+        # print(f"found {len(partial_subunits)} partial subunits in {pdb_filename}")
         partial_subunits = sorted(partial_subunits, key=lambda x: (x.subunit_name, x.chain_id, x.start_residue_id))
         pdb_path_to_partial_subunits[pdb_path] = partial_subunits
     return pdb_path_to_partial_subunits
@@ -251,7 +247,7 @@ def get_pdb_to_partial_subunits(pdbs_folder: str, subunits_info: SubunitsInfo) -
 
 def extract_representative_subunits(pdb_path_to_partial_subunits: Dict[str, List[PartialSubunit]],
                                     subunits_info: SubunitsInfo, representative_subunits_path: str):
-    ref_structs: Dict[SubunitName, Tuple[float, PartialSubunit]] = {}
+    rep_structs: Dict[SubunitName, Tuple[float, PartialSubunit]] = {}
     for pdb_path, partial_subunits in pdb_path_to_partial_subunits.items():
         for partial_subunit in partial_subunits:
             subunit_seq = "".join([i for i in subunits_info[partial_subunit.subunit_name].sequence if i != "X"])
@@ -259,20 +255,20 @@ def extract_representative_subunits(pdb_path_to_partial_subunits: Dict[str, List
                 continue
             subunit_residues = _get_partial_subunit_residues(partial_subunit)
             plddt_score = sum([res["CA"].get_bfactor() for res in subunit_residues]) / len(subunit_residues)
-            if ref_structs.get(partial_subunit.subunit_name, (-1, None))[0] < plddt_score:
-                ref_structs[partial_subunit.subunit_name] = (plddt_score, partial_subunit)
-    assert len(ref_structs) == len(subunits_info), "missing ref subunits for" + \
-                                                   str(set(subunits_info.keys()) - set(ref_structs.keys()))
-    for subunit_name, (plddt_score, partial_subunit) in ref_structs.items():
-        print(f"ref {subunit_name} has plddt score {plddt_score}")
+            if rep_structs.get(partial_subunit.subunit_name, (-1, None))[0] < plddt_score:
+                rep_structs[partial_subunit.subunit_name] = (plddt_score, partial_subunit)
+    assert len(rep_structs) == len(subunits_info), "missing rep subunits for" + \
+                                                   str(set(subunits_info.keys()) - set(rep_structs.keys()))
+    for subunit_name, (plddt_score, partial_subunit) in rep_structs.items():
+        print(f"rep {subunit_name} has plddt score {plddt_score}")
         subunit_info = subunits_info[subunit_name]
-        ref_struct_path = os.path.join(representative_subunits_path, f"{subunit_name}.pdb")
-        extract_partial_subunit(partial_subunit, ref_struct_path)
-        copy_pdb_set_start_offset(ref_struct_path, subunit_info.start_res, ref_struct_path)
+        rep_struct_path = os.path.join(representative_subunits_path, f"{subunit_name}.pdb")
+        extract_partial_subunit(partial_subunit, rep_struct_path)
+        copy_pdb_set_start_offset(rep_struct_path, subunit_info.start_res, rep_struct_path)
         for chain_name, ident_subunit_name in zip(subunit_info.chain_names, subunit_info.get_chained_names()):
-            copy_pdb_rename_chain(ref_struct_path, chain_name,
+            copy_pdb_rename_chain(rep_struct_path, chain_name,
                                   os.path.join(representative_subunits_path, f"{ident_subunit_name}.pdb"))
-        os.remove(ref_struct_path)
+        os.remove(rep_struct_path)
 
 
 def extract_transformations(pdb_path_to_partial_subunits: Dict[str, List[PartialSubunit]], subunits_info: SubunitsInfo,
@@ -280,7 +276,7 @@ def extract_transformations(pdb_path_to_partial_subunits: Dict[str, List[Partial
     temp_folder = os.path.join(transformations_path, "temp_transformations")
     transformations_by_pdb_path: Dict[str, List[TransformationInfo]] = {}
     for pdb_path, partial_subunits in pdb_path_to_partial_subunits.items():
-        print("--- processing transformations", pdb_path)
+        print("- Extracting pairwise transformations from file", pdb_path)
         if os.path.exists(temp_folder):
             print("removing temp folder")
             shutil.rmtree(temp_folder)
@@ -311,7 +307,7 @@ def extract_transformations(pdb_path_to_partial_subunits: Dict[str, List[Partial
 
         with open(output_file_path, "w") as f:
             for i, transformation in enumerate(transformations):
-                description = f"{transformation.ref_imposed_rmsds[0]}_{transformation.ref_imposed_rmsds[1]}_" \
+                description = f"{transformation.rep_imposed_rmsds[0]}_{transformation.rep_imposed_rmsds[1]}_" \
                               f"{transformation.pdb_chain_ids[0]}_{transformation.pdb_chain_ids[1]}_" \
                               f"{os.path.basename(transformation.pdb_path)}"
                 f.write(f"{i + 1} | {transformation.score} | {description} | {transformation.transformation_numbers}\n")
@@ -327,9 +323,15 @@ def extract_transformations(pdb_path_to_partial_subunits: Dict[str, List[Partial
         os.remove(output_file_path)
 
 
-def run_on_pdbs_folder(subunits_json_path: str, pdbs_folder: str, output_path: str):
+def run_on_pdbs_folder(subunits_json_path: str, pdbs_folder: str, output_path: str, output_cif: bool = False,
+                       max_results_number: int = 5):
     pdbs_folder = os.path.abspath(pdbs_folder)
     output_path = os.path.abspath(output_path)
+
+    if not os.path.exists(COMB_ASSEMBLY_BIN_PATH):
+        print(f"combinatorial assembly binary not found at {COMB_ASSEMBLY_BIN_PATH}, compile it by: \n"
+              f"cd {os.path.dirname(COMB_ASSEMBLY_BIN_PATH)} && make")
+        return
 
     if os.path.exists(output_path) and os.listdir(output_path):
         print(f"output path {output_path} is not empty, exiting")
@@ -337,22 +339,25 @@ def run_on_pdbs_folder(subunits_json_path: str, pdbs_folder: str, output_path: s
 
     subunits_info: SubunitsInfo = read_subunits_info(subunits_json_path)
 
-    representative_subunits_path = os.path.join(output_path, "assembly_output")  # this is also the assembly output path
-    transformations_path = os.path.join(output_path, "transformations")
+    # representative_subunits_path is also the assembly algorithm output path
+    representative_subunits_path = os.path.join(output_path, "_unified_representation", "assembly_output")
+    transformations_path = os.path.join(output_path, "_unified_representation", "transformations")
     os.makedirs(representative_subunits_path, exist_ok=True)
     os.makedirs(transformations_path, exist_ok=True)
 
+    print("--- Searching for subunits in supplied PDB files")
     pdb_path_to_partial_subunits = get_pdb_to_partial_subunits(pdbs_folder, subunits_info)
 
-    print(pdb_path_to_partial_subunits)
-
+    print("--- Extracting representative subunits (for each subunit, its best scored model in the PDBs folder)")
     extract_representative_subunits(pdb_path_to_partial_subunits, subunits_info, representative_subunits_path)
-    print("done extracting representative subunits")
 
+    print("--- Extracting pairwise transformations between subunits (from each PDB file with 2 or more subunits)")
     extract_transformations(pdb_path_to_partial_subunits, subunits_info, representative_subunits_path,
                             transformations_path)
-    print("done extracting transformations")
 
+    print("--- Finished building unified representation")
+
+    print("--- Running combinatorial assembly algorithm, may take a while")
     # prepare and run assembly
     with open(os.path.join(representative_subunits_path, "chain.list"), "w") as f:
         sorted_all_subunits = sorted(sum([i.get_chained_names() for i in subunits_info.values()], []))
@@ -363,15 +368,29 @@ def run_on_pdbs_folder(subunits_json_path: str, pdbs_folder: str, output_path: s
 
     subprocess.run(f"{COMB_ASSEMBLY_BIN_PATH} chain.list {transformations_path}/ 900 100 xlink_consts.txt "
                    f"-b 0.05 -t 80 > output.log 2>&1", shell=True)
-    print("done running assembly")
+    print("--- Finished combinatorial assembly, writing output models")
 
     # build pdbs from assembly output
-    clusters_path = os.path.join(output_path, "assembly_output", "output_clustered.res")
+    clusters_path = os.path.join(representative_subunits_path, "output_clustered.res")
     if not os.path.exists(clusters_path):
         print(f"Could not assemble, exiting")
         return
-    assembled_pdbs = create_complexes(clusters_path)
-    print(f"assembled {len(assembled_pdbs)} complexes")
+    assembled_files = create_complexes(clusters_path, first_result=0, last_result=max_results_number,
+                                       output_folder=os.path.join(output_path, "assembled_results"),
+                                       output_cif=output_cif)
+
+    confidence = []
+    for result_as_str in open(clusters_path, "r").read().split("\n")[:len(assembled_files)]:
+        if not result_as_str.strip():
+            continue
+        splitted_result = result_as_str.split(" ")
+        confidence.append(float(splitted_result[splitted_result.index("weightedTransScore") + 1]))
+
+    with open(os.path.join(output_path, "assembled_results", "confidence.txt"), "w") as f:
+        for filename, c in zip(assembled_files, confidence):
+            f.write(f"{filename} {c}\n")
+
+    print(f"--- Assembled {len(assembled_files)} complexes, confidence: {min(confidence)}-{max(confidence)}")
 
 
 if __name__ == '__main__':

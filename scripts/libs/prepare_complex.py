@@ -11,45 +11,44 @@ import Bio.PDB, Bio.SeqIO, Bio.SeqUtils
 import Bio.PDB.Residue
 
 
-def _merge_pdbs(pdb1_path: str, pdb2_path: str, output_path: str, override_chain_names: bool = False,
-                override_res_nums: bool = False):
-    pdb1_lines = open(pdb1_path, "rb").read().split(b"\n")
-    pdb2_lines = open(pdb2_path, "rb").read().split(b"\n")
+def read_model_path(pdb_path: str):
+    if pdb_path.endswith(".cif"):
+        return Bio.PDB.MMCIFParser().get_structure("s_cif", pdb_path)
+    return Bio.PDB.PDBParser(QUIET=True).get_structure("s_pdb", pdb_path)
 
-    final_lines = [line for line in pdb1_lines if line[:6] == b"ATOM  "]
 
-    pdb1_chains = set()
-    pdb1_last_res = pdb1_last_atom = 0
-    for line in pdb1_lines:
-        if line[:6] != b"ATOM  ":
-            continue
-        pdb1_last_atom = max(pdb1_last_atom, int(line[6:11]))
-        pdb1_last_res = max(pdb1_last_res, int(line[22:26]))
-        pdb1_chains.add(line[21:22])
-    pdb2_new_chains = {}
-    pdb2_new_res = {}
-    for line in pdb2_lines:
-        if line[:6] != b"ATOM  ":
-            continue
-        new_atom_num = str((pdb1_last_atom + 1) % 100000).rjust(5).encode("ascii")
-        pdb1_last_atom += 1
-        if line[22:26] not in pdb2_new_res:
-            if override_res_nums:
-                pdb2_new_res[line[22:26]] = str(pdb1_last_res + 1).rjust(4).encode("ascii")
-            else:
-                pdb2_new_res[line[22:26]] = line[22:26]
-            pdb1_last_res += 1
-        new_res_num = pdb2_new_res[line[22:26]]
+def _merge_models(model_path1: str, model_path2: str, output_path: str, output_cif: bool = False):
+    # print(f"merging {model_path1} and {model_path2} to {output_path}")
+    model_struct1 = read_model_path(model_path1)
+    model_struct2 = read_model_path(model_path2)
 
-        if override_chain_names and line[21:22] not in pdb2_new_chains:
-            available_chars = [bytes([c]) for c in b"ABCDEFGHIJKLMNOPQRSTUVWXYZ"
-                               if bytes([c]) not in pdb1_chains and bytes([c]) not in pdb2_new_chains.values()]
-            pdb2_new_chains[line[21:22]] = available_chars[0]
-            print(line[21:22], available_chars, pdb2_new_chains)
+    model_1 = next(iter(model_struct1))
+    model_2 = next(iter(model_struct2))
 
-        final_lines.append(line[:6] + new_atom_num + line[11:21] + pdb2_new_chains.get(line[21:22], line[21:22])
-                           + new_res_num + line[26:])
-    open(output_path, "wb").write(b"\n".join(final_lines))
+    chains_1 = {i.get_id(): i for i in model_1.get_chains()}
+    chains_2 = {i.get_id(): i for i in model_2.get_chains()}
+
+    for chain in chains_2.values():
+        if chain.id in chains_1:
+            res_to_move = [i for i in chain.get_residues()]
+            chains_1[chain.id].child_list += res_to_move
+            chains_1[chain.id].child_list.sort(key=lambda x: x.id[1])
+            for res in res_to_move:
+                chain.detach_child(res.id)
+                res.detach_parent()
+                res.parent = chains_1[chain.id]
+
+            chains_1[chain.id].child_list += chain.child_list
+        else:
+            model_1.child_list.append(chain)
+            chain.parent = model_1
+    # save the new structure to output_pdb
+    if output_cif:
+        io = Bio.PDB.MMCIFIO()
+    else:
+        io = Bio.PDB.PDBIO()
+    io.set_structure(model_struct1)
+    io.save(output_path)
 
 
 def _rotate_atom(coord, euler_rotation_tuple):
@@ -87,24 +86,10 @@ def apply_transform(pdb_path: str, output_path: str, transform_numbers: List[flo
     io.save(output_path)
 
 
-def fix_residue_order(pdb_path: str, output_path: str):
-    parser = Bio.PDB.PDBParser(QUIET=True)
-    pdb_struct = parser.get_structure("original_pdb", pdb_path)
-
-    for chain in pdb_struct.get_chains():
-        residues = [r for r in chain]
-        chain.child_list = sorted(residues, key=lambda x: x.full_id)
-
-    io = Bio.PDB.PDBIO()
-    io.set_structure(pdb_struct)
-    io.save(output_path)
-
-
-def create_transformation_pdb(assembly_path: str, transforms_str: str, output_path: str):
-    # based on /cs/labs/dina/bshor/repos/PenCombDock/bin/prepareComplex.pl chain.list clusters.res 1 10 combdock_complex
-    # transforms_str = "0(-0.00760431 -1.00941 -2.38469 21.6924 -87.7727 -10.4274),1(0 0 0 0 0 0),
+def create_transformation_pdb(assembly_path: str, transforms_str: str, output_path: str, output_cif: bool = False):
+    # example: transforms_str = "0(-0.00760431 -1.00941 -2.38469 21.6924 -87.7727 -10.4274),1(0 0 0 0 0 0),
     # 2(-2.96419 0.240678 -0.964002 65.6247 -63.7248 -42.0541)"
-    tmp_pdb_path = os.path.join(assembly_path, "bshor_tmp_comb_trans.pdb")
+    tmp_pdb_path = os.path.join(assembly_path, "tmp_comb_trans.pdb")
     chains_path = os.path.join(assembly_path, "chain.list")
     if not os.path.exists(chains_path):
         chains_path = os.path.join(assembly_path, "chains.txt")
@@ -120,31 +105,43 @@ def create_transformation_pdb(assembly_path: str, transforms_str: str, output_pa
 
         apply_transform(subunit_path, tmp_pdb_path, transform_numbers)
         if os.path.exists(output_path):
-            _merge_pdbs(output_path, tmp_pdb_path, output_path)
+            _merge_models(output_path, tmp_pdb_path, output_path, output_cif=output_cif)
         else:
-            shutil.copy(tmp_pdb_path, output_path)
-    fix_residue_order(output_path, output_path)
-
+            if output_cif:
+                io = Bio.PDB.MMCIFIO()
+                io.set_structure(read_model_path(tmp_pdb_path))
+                io.save(output_path)
+            else:
+                shutil.copy(tmp_pdb_path, output_path)
+    if output_cif:
+        # fix _atom_site in cif
+        cif_lines = open(output_path, "r").read().split("\n")
+        cif_lines = [i + " " if i.startswith("_atom_site") else i for i in cif_lines]
+        open(output_path, "w").write("\n".join(cif_lines) + "\n")
     os.remove(tmp_pdb_path)
 
 
-def create_complexes(result_path: str, first_result: Optional[int] = None, last_result: Optional[int] = None) \
+def create_complexes(result_path: str, first_result: Optional[int] = None, last_result: Optional[int] = None,
+                     output_folder: Optional[str] = None, output_cif: bool = False) \
         -> List[str]:
+    output_folder = output_folder or os.path.dirname(result_path)
+    os.makedirs(output_folder, exist_ok=True)
     assembly_path = os.path.dirname(result_path)
     transforms_strs = [i[i.index("[") + 1:i.index("]")] for i in open(result_path, "r").read().split("\n") if i]
 
     if first_result is None:
         first_result = 0
-    if last_result is None:
+    if last_result is None or last_result > len(transforms_strs):
         last_result = len(transforms_strs)
 
-    pdb_files = []
-    for i in range(first_result, min(len(transforms_strs), last_result)):
-        output_path = os.path.join(assembly_path,
-                                   os.path.basename(result_path).split(".")[0] + "_" + str(i) + ".pdb")
-        create_transformation_pdb(assembly_path, transforms_strs[i], output_path=output_path)
-        pdb_files.append(output_path)
-    return pdb_files
+    output_files = []
+    for i in range(first_result, last_result):
+        file_ext = ".cif" if output_cif else ".pdb"
+        output_path = os.path.join(output_folder,
+                                   os.path.basename(result_path).split(".")[0] + "_" + str(i) + file_ext)
+        create_transformation_pdb(assembly_path, transforms_strs[i], output_path=output_path, output_cif=output_cif)
+        output_files.append(output_path)
+    return output_files
 
 
 if __name__ == '__main__':
