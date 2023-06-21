@@ -48,16 +48,26 @@ SubunitsInfo = Dict[SubunitName, SubunitInfo]
 
 
 def save_subunits_info(subunits_info: SubunitsInfo, output_path: str):
-    json_data = {domain_name: domain_info.to_dict() for domain_name, domain_info in subunits_info.items()}
+    json_data = {subunit_name: subunit_info.to_dict() for subunit_name, subunit_info in subunits_info.items()}
     json.dump(json_data, open(output_path, "w"), indent=2)
 
 
 def read_subunits_info(output_path: str) -> SubunitsInfo:
     json_data = json.load(open(output_path))
-    subunits_info = {domain_name: SubunitInfo.from_dict({k: v for k, v in domain_info.items() if k != "end_res"})
-                     for domain_name, domain_info in json_data.items()}
-    for domain_name, domain_info in subunits_info.items():
-        assert domain_name == domain_info.name, "Domain name and domain info name must match"
+    subunits_info = {subunit_name: SubunitInfo.from_dict({k: v for k, v in subunit_info.items() if k != "end_res"})
+                     for subunit_name, subunit_info in json_data.items()}
+    for subunit_name, subunit_info in subunits_info.items():
+        assert subunit_name == subunit_info.name, f"Key name and subunit info name must match, mismatch:" \
+                                                  f" {subunit_name} and {subunit_info.name}"
+    res_to_subunit_name = {}
+    for subunit_name, subunit_info in subunits_info.items():
+        for chain_name in subunit_info.chain_names:
+            for res_id in subunit_info.get_active_res_ids():
+                res_key = (chain_name, res_id)
+                assert res_key not in res_to_subunit_name, \
+                    f"Residue {res_id} in chain {chain_name} is present in multiple subunits - " \
+                    f"{subunit_name} and {res_to_subunit_name[res_key]}. overlaps are not allowed in subunits."
+                res_to_subunit_name[res_key] = subunit_name
     return subunits_info
 
 
