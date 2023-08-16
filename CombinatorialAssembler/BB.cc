@@ -3,7 +3,8 @@
 #include <Common.h>
 #include <connolly_surface.h>
 
-BB::BB(int id, const std::string pdbFileName, int groupID, const ChemLib &lib, float gridResolution, float gridMargins)
+BB::BB(int id, const std::string pdbFileName, int groupID, const ChemLib &lib, float gridResolution, float gridMargins,
+       float minTempFactor)
     : id_(id), groupId_(groupID), pdbFileName_(pdbFileName) {
     // read atoms
     Common::readChemMolecule(pdbFileName_, allAtoms_, lib);
@@ -37,7 +38,7 @@ BB::BB(int id, const std::string pdbFileName, int groupID, const ChemLib &lib, f
         atomsMap.push_back(&(*i));
     }
 
-    computeFragments(); // get the endpoints
+    computeFragments(minTempFactor); // get the endpoints
 
     for (Molecule<Atom>::const_iterator it = caAtoms_.begin(); it != caAtoms_.end(); it++) {
         resIndexToCAAtom[it->residueIndex()] = *it;
@@ -54,7 +55,7 @@ BB::BB(int id, const std::string pdbFileName, int groupID, const ChemLib &lib, f
     std::cout << " done reading BB " << pdbFileName_.c_str() << std::endl;
 }
 
-void BB::computeFragments() {
+void BB::computeFragments(float minTempFactor) {
     // calculate endpoints
     char currChain;
     int firstResIndex, prevResIndex;
@@ -62,6 +63,8 @@ void BB::computeFragments() {
     for (auto i = allAtoms_.begin(); i != allAtoms_.end(); i++) {
         // only CA atoms are considered
         if (!i->isCA())
+            continue;
+        if (i->getTempFactor() < minTempFactor)
             continue;
         char chain = i->chainId();
         int resIndex = i->residueIndex();

@@ -11,7 +11,7 @@
 class BBContainer {
   public:
     // Constructor
-    BBContainer(std::string SUFileName, std::string chemLibFileName);
+    BBContainer(std::string SUFileName, std::string chemLibFileName, float minTempFactor);
 
     // Group: access
     std::shared_ptr<const BB> getBB(unsigned int bbIndex) const { return bbs_[bbIndex]; }

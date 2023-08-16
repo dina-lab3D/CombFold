@@ -83,8 +83,12 @@ int ComplexDistanceConstraint::readRestraintsFile(const std::string fileName) {
     Logger::infoMessage() << "# of xlinks " << xnum << " read from file" << fileName << std::endl;
     int MAX_OFFSET = 20;
 
+    crosslinkIndToWeight_ = std::vector<float>(crosslinks.size());
+
     // map them to BB pairs
     for (unsigned int i = 0; i < crosslinks.size(); i++) {
+        crosslinkIndToWeight_[i] = crosslinks[i].getWeight();
+
         // SUs that have xlinks endpoints (sus1, sus2)
         std::string residueSequenceID1 = std::to_string(crosslinks[i].getResidue1());
         std::set<int> sus1 = getSUs(residueSequenceID1, crosslinks[i].getChain1());
@@ -167,5 +171,15 @@ float ComplexDistanceConstraint::getRestraintsRatio(const std::vector<std::share
     if (totalSeenCrosslinks.size() == 0)
         return 1.0;
 
-    return (float)satisfiedCrosslinks.size() / (float)totalSeenCrosslinks.size();
+    float satisfiedWeight = 0.0;
+    float totalWeight = 0.0;
+    for (auto it = satisfiedCrosslinks.begin(); it != satisfiedCrosslinks.end(); it++) {
+        satisfiedWeight += crosslinkIndToWeight_[*it];
+    }
+    for (auto it = totalSeenCrosslinks.begin(); it != totalSeenCrosslinks.end(); it++) {
+        totalWeight += crosslinkIndToWeight_[*it];
+    }
+
+    return satisfiedWeight / totalWeight;
+    // return (float)satisfiedCrosslinks.size() / (float)totalSeenCrosslinks.size();
 }

@@ -24,7 +24,8 @@ class BB {
   public:
     friend class SuperBB;
 
-    BB(int id, const std::string pdbFilename, int groupID, const ChemLib &lib, float gridResolution, float gridMargins);
+    BB(int id, const std::string pdbFilename, int groupID, const ChemLib &lib, float gridResolution, float gridMargins,
+       float minTempFactor);
 
     // access
     int getID() const { return id_; }
@@ -67,7 +68,7 @@ class BB {
     
   private:
     // after BB is initialized, compute chains and fragment ranges
-    void computeFragments();
+    void computeFragments(float minTempFactor);
 
   private:
     // surface points

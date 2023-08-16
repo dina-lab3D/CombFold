@@ -57,6 +57,7 @@ class ComplexDistanceConstraint {
     int numberOfConstraints_ = 0;
     int numberOfRestraints_ = 0;
     std::vector<std::vector<unsigned int>> restraintIndsToCrosslinkInds_;
+    std::vector<float> crosslinkIndToWeight_;
 };
 
 #endif

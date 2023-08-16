@@ -9,7 +9,7 @@ std::string trim_extension(const std::string file_name) {
 }
 } // namespace
 
-BBContainer::BBContainer(const std::string SUFileName, std::string chemLibFileName) {
+BBContainer::BBContainer(const std::string SUFileName, std::string chemLibFileName, float minTempFactor) {
     readSUFile(SUFileName);
 
     // prepare ChemLib
@@ -18,7 +18,7 @@ BBContainer::BBContainer(const std::string SUFileName, std::string chemLibFileNa
     // read the building blocks
     bbs_.reserve(numOfBBs_);
     for (unsigned int i = 0; i < numOfBBs_; i++) {
-        bbs_.push_back(std::make_shared<BB>(i, pdbs_[i], groupIDs_[i], chemLib, 0.5, 5.0));
+        bbs_.push_back(std::make_shared<BB>(i, pdbs_[i], groupIDs_[i], chemLib, 0.5, 5.0, minTempFactor));
     }
 }
 

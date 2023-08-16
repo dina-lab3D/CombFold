@@ -108,7 +108,7 @@ int main(int argc, char *argv[]) {
     std::string argv_str(argv[0]);
     std::string base = argv_str.substr(0, argv_str.find_last_of("/"));
     std::string chemLibFileName = base + "/chem_params.txt";
-    BBContainer bbContainer(suFileName, chemLibFileName);
+    BBContainer bbContainer(suFileName, chemLibFileName, minTemperatureToConsiderCollision);
     bbContainer.readTransformationFiles(transFilesPrefix, transNumToRead);
 
     std::cout << "Starting HierarchicalFold" << std::endl;
