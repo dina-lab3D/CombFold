@@ -10,7 +10,8 @@ static float scoreSuperBB(const std::shared_ptr<SuperBB> &sbb) {
 
     // Note: if you change this, you also needs to change in HierarchicalFold::tryToConnect which optimizes by 
     // summing and comparing trans scores before trying to connect
-    return sbb->transScore_;
+    // return sbb->transScore_;
+    return sbb->transScore_ * sbb->getRestraintsRatio();
 }
 struct comp {
     bool operator()(const std::shared_ptr<SuperBB> &lhs, const std::shared_ptr<SuperBB> &rhs) const {
