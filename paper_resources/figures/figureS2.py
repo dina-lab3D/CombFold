@@ -56,8 +56,16 @@ def main():
 
     print("AFMv3 able to assemble ", len([i for i in afm3_results.values() if i]))
 
-    # Fig 3A - bar graph - Combfold vs. AFMv2
-    name1, name2 = "CombFold", "AFMv3"
+    # load rossetta results
+    rosetta_results_path = os.path.join(benchmark_path, "rosetta_results.json")
+    rosetta_results_json = json.load(open(rosetta_results_path, "r"))
+    rosetta_results = {jobname: [i["tm_score"] for i in results.values()] if results else []
+                       for jobname, results in rosetta_results_json.items()}
+
+    print("Rosetta able to assemble ", len([i for i in rosetta_results.values() if i]))
+
+    # Create bar plot
+    name1, name2, name3 = "CombFold", "AFMv3", "RosettaFold2"
     th_high, th_accept = 0.8, 0.7
     bar_width = 0.3
     fig, ax = plt.subplots()
@@ -67,13 +75,17 @@ def main():
         labels.append(f"Top {max_t}")
         results1 = [max(v[:max_t], default=0) for v in combfold_parsed_results.values()]
         results2 = [max(v[:max_t], default=0) for v in afm3_results.values()]
+        results3 = [max(v[:max_t], default=0) for v in rosetta_results.values()]
         res1_high = len([i for i in results1 if i >= th_high])
         res1_acceptable = len([i for i in results1 if th_high > i >= th_accept])
         res2_high = len([i for i in results2 if i >= th_high])
         res2_acceptable = len([i for i in results2 if th_high > i >= th_accept])
+        res3_high = len([i for i in results3 if i >= th_high])
+        res3_acceptable = len([i for i in results3 if th_high > i >= th_accept])
 
         print(name1, max_t, res1_high, res1_acceptable)
         print(name2, max_t, res2_high, res2_acceptable)
+        print(name3, max_t, res3_high, res3_acceptable)
 
         ax.bar(count, [res1_high / len(pdb_to_subunits)], color='#1f78b4', width=bar_width, edgecolor='grey',
                label=f"{name1}\nHigh")
@@ -83,6 +95,10 @@ def main():
                label=f"{name2}\nHigh")
         ax.bar(count + bar_width, [res2_acceptable / len(pdb_to_subunits)], color='#ff7f00', alpha=0.5, width=bar_width,
                edgecolor='grey', bottom=[res2_high / len(pdb_to_subunits)], label=f"{name2}\nAcceptable")
+        ax.bar(count + 2 * bar_width, [res3_high / len(pdb_to_subunits)], color='#33a02c', width=bar_width, edgecolor='grey',
+               label=f"{name3}\nHigh")
+        ax.bar(count + 2 * bar_width, [res3_acceptable / len(pdb_to_subunits)], color='#33a02c', alpha=0.5, width=bar_width,
+               edgecolor='grey', bottom=[res3_high / len(pdb_to_subunits)], label=f"{name3}\nAcceptable")
 
     plt.ylabel('Success rate', fontsize=11)
     plt.xticks([i + bar_width / 2 for i in range(len(labels))], labels, fontsize=8)
@@ -91,8 +107,11 @@ def main():
     handles, labels = plt.gca().get_legend_handles_labels()
     new_labels, new_handles = [], []
     for handle, label in zip(handles, labels):
-        if label not in new_labels:
-            new_labels.append(label)
+        if "High" not in label:
+            continue
+        small_label = label.replace("\nHigh", "")
+        if small_label not in new_labels:
+            new_labels.append(small_label)
             new_handles.append(handle)
     ax.legend(new_handles, new_labels, bbox_to_anchor=(1, 0), loc='lower left',  fontsize=8, ncol=2)
 
@@ -115,10 +134,12 @@ def main():
 
     fig, ax = plt.subplots(figsize=(2.25, 1.75), dpi=600)
     ax.scatter(combfold_tm_results, afm2_tm_results, alpha=0.4, s=10, edgecolor='none')
-    ax.set_xlabel("CombFold TM-score", fontsize=11)
-    ax.set_ylabel("AFMv2 TM-score", fontsize=11)
+    ax.set_xlabel("CombFold", fontsize=11)
+    ax.set_ylabel("AFMv3", fontsize=11)
     plt.yticks(np.arange(0, 1.2, 0.2), fontsize=8)
     plt.xticks(np.arange(0, 1.2, 0.2), fontsize=8)
+
+    ax.text(0.5, 1.1, "Top-1 TM-score", ha='center', va='center', transform=ax.transAxes, fontsize=11)
 
     plt.gca().spines['top'].set_visible(False)
     plt.gca().spines['right'].set_visible(False)
