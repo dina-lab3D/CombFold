@@ -45,8 +45,8 @@ int main(int argc, char *argv[]) {
     desc.add_options()("help,h", "Combinatoral Assembly help")("version", "CombFold 1.0 2022")(
         "penetrationThr,p", po::value<double>(&penetrationThr)->default_value(-1.0),
         "maximum allowed penetration between subunit surfaces (default = -1.0)")(
-        "restraintsRatio,r", po::value<double>(&restraintsRatio)->default_value(0.7),
-        "constraints ratio (default = 0.7)")("clusterRMSD,c", po::value<double>(&clusterRMSD)->default_value(5.0),
+        "restraintsRatio,r", po::value<double>(&restraintsRatio)->default_value(0.1),
+        "constraints ratio (default = 0.1)")("clusterRMSD,c", po::value<double>(&clusterRMSD)->default_value(5.0),
                                              "final clustering RMSD (default = 5.0)")
 
         ("maxBackboneCollisionPerChain,b", po::value<float>(&maxBackboneCollisionPerChain)->default_value(0.1),
