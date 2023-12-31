@@ -106,6 +106,8 @@ int ComplexDistanceConstraint::readRestraintsFile(const std::string fileName) {
                 int rOffset = 0;
                 int receptorAtomIndex = bbs_[*suIndexIter1]->allAtoms_.getClosestAtomEntryForResIndex(
                     chainId1, residueSequenceID1, MAX_OFFSET, rOffset);
+                if (rOffset < 0)
+                    rOffset = -1 * rOffset;
                 if (receptorAtomIndex == -1)
                     continue;
                 Vector3 rcoord = bbs_[*suIndexIter1]->getChemAtomByIndex(receptorAtomIndex).position();
@@ -118,6 +120,8 @@ int ComplexDistanceConstraint::readRestraintsFile(const std::string fileName) {
                             chainId2, residueSequenceID2, MAX_OFFSET, lOffset);
                         if (ligandAtomIndex == -1)
                             continue;
+                        if (lOffset < 0)
+                            lOffset = -1 * lOffset;
 
                         Vector3 lcoord = bbs_[*suIndexIter2]->getChemAtomByIndex(ligandAtomIndex).position();
 
@@ -136,7 +140,7 @@ int ComplexDistanceConstraint::readRestraintsFile(const std::string fileName) {
 
                         std::cout << " adding restraint to " << *suIndexIter1 << "x" << *suIndexIter2 << " :"
                                   << residueSequenceID1 << chainId1 << " : " << residueSequenceID2 << chainId2
-                                  << " dist " << maxDistance << " " << minDistance << "indexes " << ind1 << " : "
+                                  << " dist " << maxDistance << " " << minDistance << " indexes " << ind1 << " : "
                                   << ind2 << std::endl;
                     }
                 }
