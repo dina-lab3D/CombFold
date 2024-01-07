@@ -277,6 +277,17 @@ void HierarchicalFold::fold(const std::string &outFileNamePrefix) {
         }
 
         printBestK(N_, keptResultsByLength[length]);
+	// output all subsets
+        for (unsigned int i = N_; i > 1; i--) {
+            if (keptResultsByLength[i]->size() == 0)
+                continue;
+            std::string outFileName = "tmp_cb_" + std::to_string(i) + "_" + outFileNamePrefix + ".res";
+            std::ofstream outFile(outFileName);
+            for (auto it = keptResultsByLength[i]->rbegin(); it != keptResultsByLength[i]->rend(); it++)
+                (*it)->fullReport(outFile);
+            outFile.close();
+	    break;
+        }
     }
 
     // output fully assembled results or largest subsets
