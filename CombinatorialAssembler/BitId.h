@@ -2,6 +2,7 @@
 #define BITID_H
 
 #include <ostream>
+#include <bitset>
 
 
 template <size_t N>
