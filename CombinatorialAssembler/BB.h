@@ -3,6 +3,7 @@
 
 #include "BBGrid.h"
 #include "TransformationAndScore.h"
+#include "BitId.h"
 
 #include <ChemMolecule.h>
 #include <GeomScore.h>
@@ -29,7 +30,7 @@ class BB {
 
     // access
     int getID() const { return id_; }
-    unsigned long bitId() const { return 1 << id_; }
+    BitId bitId() const { return BitId(id_); }
     int groupId() const { return groupId_; }
     std::string getPDBFileName() const { return pdbFileName_; }
 

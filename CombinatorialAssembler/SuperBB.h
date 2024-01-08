@@ -16,14 +16,14 @@ class SuperBB {
 
     SuperBB(std::shared_ptr<const BB> bb);
 
-    unsigned int bitIds() const { return bitIDS_; }
+    BitId bitIds() const { return bitIDS_; }
     unsigned int size() const { return size_; }
     float getRestraintsRatio() const { return restraintsRatio_; }
     void setRestraintsRatio(float r) { restraintsRatio_ = r; }
 
     // This function takes Two super BBs and joins them using a transformation between to BBs
     void join(const RigidTrans3 &trans, const SuperBB &other, int bbPen, FoldStep &step, float transScore);
-    void replaceIdentBB(unsigned long oldBBBitId, std::shared_ptr<const BB> bb);
+    void replaceIdentBB(BitId oldBBBitId, std::shared_ptr<const BB> bb);
 
     // This function checks for collissions - Receives transformation and a second super BB and decides if
     // they collide
@@ -38,7 +38,7 @@ class SuperBB {
     // members
     unsigned int size_;
     std::vector<FoldStep> foldSteps_; // FoldStep is a transformation between two SUs
-    unsigned int bitIDS_;
+    BitId bitIDS_;
     float restraintsRatio_;
 
   public: // TODO: Make private

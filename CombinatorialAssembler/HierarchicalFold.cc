@@ -11,7 +11,7 @@ std::vector<std::vector<unsigned int>> createIdentGroups(unsigned int N_, BestKC
     std::vector<bool> addedToGroup(N_, false);
     std::vector<std::vector<unsigned int>> identGroups;
     for (unsigned int i = 0; i < N_; i++) {
-        std::shared_ptr<SuperBB> sbbI = *(bestKContainer_[1 << i].begin());
+        std::shared_ptr<SuperBB> sbbI = *(bestKContainer_[BitId(i)].begin());
         const std::shared_ptr<const BB> bbI = sbbI->bbs_[0];
 
         if (addedToGroup[i])
@@ -21,7 +21,7 @@ std::vector<std::vector<unsigned int>> createIdentGroups(unsigned int N_, BestKC
 
         for (unsigned int j = i + 1; j < N_; j++) {
             std::cout << "checking ident " << i << " & " << j << std::endl;
-            std::shared_ptr<SuperBB> sbbJ = *(bestKContainer_[1 << j].begin());
+            std::shared_ptr<SuperBB> sbbJ = *(bestKContainer_[BitId(j)].begin());
 
             const std::shared_ptr<const BB> bbJ = sbbJ->bbs_[0];
 
@@ -52,7 +52,7 @@ std::map<unsigned int, std::vector<unsigned int>> createAssemblyGroupsMap(unsign
                                                                           BestKContainer &bestKContainer_) {
     std::map<unsigned int, std::vector<unsigned int>> assemblyGroupsMap;
     for (unsigned int i = 0; i < N_; i++) {
-        std::shared_ptr<SuperBB> sbbI = *(bestKContainer_[1 << i].begin());
+        std::shared_ptr<SuperBB> sbbI = *(bestKContainer_[BitId(i)].begin());
         const std::shared_ptr<const BB> bbI = sbbI->bbs_[0];
         if (assemblyGroupsMap.count(bbI->groupId()) == 0) {
             std::vector<unsigned int> newGroup;
@@ -76,7 +76,7 @@ std::map<unsigned int, std::vector<unsigned int>> createAssemblyGroupsMap(unsign
 void printBestK(unsigned int N_, BestK *bestK) {
     // just for print
     std::map<unsigned int, unsigned int> count_new_kept_by_bb;
-    std::map<unsigned int, unsigned int> count_new_kept_by_resSet;
+    std::unordered_map<BitId, unsigned int> count_new_kept_by_resSet;
     for (unsigned int bit_index = 0; bit_index < N_; bit_index++)
         count_new_kept_by_bb[bit_index] = 0;
     for (auto it1 = bestK->begin(); it1 != bestK->end(); it1++) {
@@ -84,7 +84,7 @@ void printBestK(unsigned int N_, BestK *bestK) {
             count_new_kept_by_resSet[(**it1).bitIds()] = 0;
         count_new_kept_by_resSet[(**it1).bitIds()] += 1;
         for (unsigned int bit_index = 0; bit_index < N_; bit_index++)
-            if (((**it1).bitIds() & (1 << bit_index)) > 0) {
+            if ((**it1).bitIds().test(bit_index)) {
                 count_new_kept_by_bb[bit_index] += 1;
             }
     }
@@ -100,7 +100,7 @@ void printBestK(unsigned int N_, BestK *bestK) {
 }
 
 bool isValidBasedOnAssembly(std::map<unsigned int, std::vector<unsigned int>> assemblyGroupsMap,
-                            unsigned long currResSet) {
+                            BitId currResSet) {
     if (assemblyGroupsMap.size() <= 1)
         return true;
 
@@ -113,8 +113,8 @@ bool isValidBasedOnAssembly(std::map<unsigned int, std::vector<unsigned int>> as
         bool seenZero = false;
         bool seenOne = false;
 
-        for (unsigned long i = 0; i < assemblyGroup.size(); i++) {
-            if (((1 << assemblyGroup[i]) & currResSet) != 0)
+        for (unsigned int i = 0; i < assemblyGroup.size(); i++) {
+            if (currResSet.test(assemblyGroup[i]))
                 seenOne = true;
             else
                 seenZero = true;
@@ -159,7 +159,7 @@ void HierarchicalFold::fold(const std::string &outFileNamePrefix) {
         unsigned int groupSize = identGroup.size() / groupDivider;
         std::vector<std::shared_ptr<SuperBB>> groupSBBs;
         for (unsigned int j = 0; j < groupSize; j++) {
-            groupSBBs.push_back(*(bestKContainer_[1 << identGroup[j]].begin()));
+            groupSBBs.push_back(*(bestKContainer_[BitId(identGroup[j])].begin()));
         }
         std::cout << "searching for size " << groupSBBs.size() << " has " << precomputedResults.count(groupSBBs.size())
                   << std::endl;
@@ -171,11 +171,11 @@ void HierarchicalFold::fold(const std::string &outFileNamePrefix) {
     for (unsigned int length = 2; length <= N_; length++) { // # subunits iteration
         std::cout << "*** running iteration " << length
                   << " prev kept results: " << keptResultsByLength[length - 1]->size() << std::endl;
-        std::map<unsigned long, BestK *> best_k_by_id;
+        std::unordered_map<BitId, BestK *> best_k_by_id;
 
         // populate with precomputedResults
         for (auto it1 = precomputedResults[length]->begin(); it1 != precomputedResults[length]->end(); it1++) {
-            unsigned long currResSet = (**it1).bitIds();
+            BitId currResSet = (**it1).bitIds();
             if (best_k_by_id.count(currResSet) == 0)
                 best_k_by_id[currResSet] = new BestK(K_);
             best_k_by_id[currResSet]->push(*it1);
@@ -190,7 +190,7 @@ void HierarchicalFold::fold(const std::string &outFileNamePrefix) {
             for (auto it1 = keptResultsByLength[firstResultSize]->begin();
                  it1 != keptResultsByLength[firstResultSize]->end(); it1++) {
                 SuperBB sbb1 = **it1;
-                unsigned long setA = sbb1.bitIds();
+                BitId setA = sbb1.bitIds();
 
                 for (auto it2 = keptResultsByLength[secondResultSize]->begin();
                      it2 != keptResultsByLength[secondResultSize]->end(); it2++) {
@@ -207,10 +207,10 @@ void HierarchicalFold::fold(const std::string &outFileNamePrefix) {
                     SuperBB sbb2 = *sbb2Pointer;
 
                     // make sure that the two results can be connected
-                    unsigned long setB = sbb2.bitIds();
+                    BitId setB = sbb2.bitIds();
                     if ((setA & setB) != 0)
                         continue;
-                    unsigned long currResSet = setA | setB;
+                    BitId currResSet = setA | setB;
                     if(!isValidBasedOnAssembly(assemblyGroupsMap, currResSet)){
                         std::cout << "invalid assembly " << currResSet << std::endl;
                         continue;
@@ -237,7 +237,7 @@ void HierarchicalFold::fold(const std::string &outFileNamePrefix) {
         }
 
         // cluster results and save them
-        std::map<unsigned long, BestK *> bestForSubunitId;
+        std::map<unsigned int, BestK *> bestForSubunitId;
         keptResultsByLength[length] = new BestK(K_);
 
         for (const auto &[currResSet, currBestK] : best_k_by_id) {
@@ -249,8 +249,8 @@ void HierarchicalFold::fold(const std::string &outFileNamePrefix) {
                           << bestKContainer_[currResSet].size() << " scores " << bestKContainer_[currResSet].minScore()
                           << ":" << bestKContainer_[currResSet].maxScore() << std::endl;
 
-                for (unsigned long i = 0; i < N_; i++) {
-                    if ((currResSet & (1 << i)) != 0) {
+                for (unsigned int i = 0; i < N_; i++) {
+                    if (currResSet.test(i)) {
                         if (bestForSubunitId.count(i) == 0) {
                             bestForSubunitId[i] = new BestK(1);
                         }
@@ -553,9 +553,9 @@ void HierarchicalFold::createSymmetry(std::vector<std::shared_ptr<SuperBB>> iden
         addedSymCount++;
     }
 
-    unsigned long groupIdentifier = 0;
+    BitId groupIdentifier;
     for (unsigned int i = 0; i < identBBs.size(); i++) {
-        groupIdentifier += identBBs[i]->bbs_[0]->bitId();
+        groupIdentifier |= identBBs[i]->bbs_[0]->bitId();
     }
     std::cout << "Created " << addedSymCount << " Symmetrical for " << groupIdentifier << std::endl;
 }
@@ -585,7 +585,7 @@ std::shared_ptr<SuperBB> HierarchicalFold::getMatchingSBB(SuperBB sbb1, SuperBB 
         bool flag = false;
         int maxIdInSbb1 = -1;
         for (unsigned int i = 0; i < identGroup.size(); i++) {
-            if (((1 << identGroup[i]) & sbb1.bitIds()) == 0) // ident_group[i] not in currResSet
+            if (!sbb1.bitIds().test(identGroup[i])) // ident_group[i] not in currResSet
                 flag = true;
             else if (flag) {
                 if (sbb1.bbs_.size() != 1)
@@ -600,7 +600,7 @@ std::shared_ptr<SuperBB> HierarchicalFold::getMatchingSBB(SuperBB sbb1, SuperBB 
         int maxIdInSbb2 = -1;
         flag = false;
         for (unsigned int i = 0; i < identGroup.size(); i++) {
-            if (((1 << identGroup[i]) & sbb2.bitIds()) == 0) // ident_group[i] not in currResSet
+            if (!sbb2.bitIds().test(identGroup[i])) // ident_group[i] not in currResSet
                 flag = true;
             else if (flag) {
                 if (sbb2.bbs_.size() != 1)
@@ -635,7 +635,7 @@ std::shared_ptr<SuperBB> HierarchicalFold::getMatchingSBB(SuperBB sbb1, SuperBB 
     for (auto iter = bbIdToNewId.rbegin(); iter != bbIdToNewId.rend(); ++iter) {
         unsigned int oldId = iter->first;
         unsigned int newId = iter->second;
-        newSbb->replaceIdentBB(1 << oldId, (*(bestKContainer_[1 << newId].begin()))->bbs_[0]);
+        newSbb->replaceIdentBB(BitId(oldId), (*(bestKContainer_[BitId(newId)].begin()))->bbs_[0]);
     }
 
     return newSbb;
@@ -650,8 +650,7 @@ void HierarchicalFold::checkConnectivity() const {
 
     Graph g(N_);
     for (unsigned int suIndex = 0; suIndex < N_; suIndex++) {
-        unsigned long one = 1;
-        unsigned long index = one << suIndex;
+        BitId index = BitId(suIndex);
         std::cerr << "isEmpty " << suIndex << " " << bestKContainer_.isEmpty(index) << std::endl;
         std::cerr << "SBB " << suIndex << " size " << bestKContainer_[index].size() << std::endl;
         if (bestKContainer_[index].size() >= 1) {
@@ -684,8 +683,7 @@ void HierarchicalFold::outputConnectivityGraph(std::string outFileName) const {
     std::ofstream outFile(outFileName);
     outFile << "SU1 Prot1 size1 SU2 Prot2 size2 Restraints" << std::endl;
     for (unsigned int suIndex = 0; suIndex < N_; suIndex++) {
-        unsigned long one = 1;
-        unsigned long set = one << suIndex;
+        BitId set = BitId(suIndex);
         std::cerr << "SBB " << suIndex << " set " << set << " isEmpty " << bestKContainer_.isEmpty(set) << std::endl;
         std::cerr << "SBB " << suIndex << " size " << bestKContainer_[set].size() << std::endl;
         if (bestKContainer_[set].size() >= 1) {
@@ -694,7 +692,7 @@ void HierarchicalFold::outputConnectivityGraph(std::string outFileName) const {
 
             for (unsigned int suIndex2 = suIndex + 1; suIndex2 < N_; suIndex2++) {
                 unsigned int transSize = bb->getTransformations(suIndex2).size();
-                unsigned long set2 = one << suIndex2;
+                BitId set2 = BitId(suIndex2);
                 std::cerr << suIndex << " " << suIndex2 << " trans size " << transSize << " " << set2 << std::endl;
                 std::shared_ptr<SuperBB> sbb2 = *(bestKContainer_[set2].rbegin());
                 std::shared_ptr<const BB> bb2 = sbb2->bbs_[0];

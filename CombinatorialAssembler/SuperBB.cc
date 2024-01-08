@@ -91,7 +91,7 @@ void SuperBB::join(const RigidTrans3 &trans, const SuperBB &other, int bbPen, Fo
     weightedTransScore_ = getWeightedTransScore(foldSteps_, bbs_);
 }
 
-void SuperBB::replaceIdentBB(unsigned long oldBBBitId, std::shared_ptr<const BB> bb) {
+void SuperBB::replaceIdentBB(BitId oldBBBitId, std::shared_ptr<const BB> bb) {
     if((bb->bitId() & bitIDS_) != 0)
         throw std::runtime_error("Tried to replace BB with BB that already exists in SuperBB");
 
@@ -108,8 +108,10 @@ void SuperBB::replaceIdentBB(unsigned long oldBBBitId, std::shared_ptr<const BB>
         throw std::runtime_error("SuperBB::replaceIdentBB: oldBBBitId not found in SuperBB");
 
     bbs_[bbIndex] = bb;
-    bitIDS_ -= oldBB->bitId();
-    bitIDS_ += bb->bitId();
+    // bitIDS_ -= oldBB->bitId();
+    // bitIDS_ += bb->bitId();
+    bitIDS_[oldBB->getID()] = false;
+    bitIDS_[bb->getID()] = true;
 
     for(FoldStep &step : foldSteps_) {
         if(step.i_ == oldBB->getID())
@@ -137,7 +139,7 @@ double SuperBB::calcRmsd(const SuperBB &other, std::vector<std::vector<unsigned 
     for (std::vector<unsigned int> identGroup : identGroups) {
         std::vector<unsigned int> possiblyRelevantIdentGroup;
         for (unsigned int i : identGroup) {
-            if ((bitIDS_ & (1 << i)) != 0)
+            if (bitIDS_.test(i))
                 possiblyRelevantIdentGroup.push_back(i);
         }
         if (possiblyRelevantIdentGroup.size() >= 2)
@@ -162,10 +164,10 @@ double SuperBB::calcRmsd(const SuperBB &other, std::vector<std::vector<unsigned 
     Match cmMatch;
     Molecule<Vector3> cmA, cmB;
 
-    for (unsigned int bitId : bbIdsInThis) {
-        Vector3 a = trans_[bbIdToThisBBIndex[bitId]] * bbs_[bbIdToThisBBIndex[bitId]]->cm_;
+    for (unsigned int bbId : bbIdsInThis) {
+        Vector3 a = trans_[bbIdToThisBBIndex[bbId]] * bbs_[bbIdToThisBBIndex[bbId]]->cm_;
         cmA.add(a);
-        Vector3 b = other.trans_[bbIdToOtherBBIndex[bitId]] * other.bbs_[bbIdToOtherBBIndex[bitId]]->cm_;
+        Vector3 b = other.trans_[bbIdToOtherBBIndex[bbId]] * other.bbs_[bbIdToOtherBBIndex[bbId]]->cm_;
         cmB.add(b);
     }
     for (unsigned int i = 0; i < size_; i++) {
@@ -185,20 +187,20 @@ double SuperBB::calcRmsd(const SuperBB &other, std::vector<std::vector<unsigned 
                     Match cmMatch;
                     Molecule<Vector3> cmA, cmB;
 
-                    for (unsigned int bitId : bbIdsInThis) {
+                    for (unsigned int bbId : bbIdsInThis) {
                         Vector3 a;
-                        if (bitId == identGroup[i]) {
-                            unsigned int replacedBitId = identGroup[j];
-                            a = trans_[bbIdToThisBBIndex[replacedBitId]] * bbs_[bbIdToThisBBIndex[replacedBitId]]->cm_;
-                        } else if (bitId == identGroup[j]) {
-                            unsigned int replacedBitId = identGroup[i];
-                            a = trans_[bbIdToThisBBIndex[replacedBitId]] * bbs_[bbIdToThisBBIndex[replacedBitId]]->cm_;
+                        if (bbId == identGroup[i]) {
+                            unsigned int replacedbbId = identGroup[j];
+                            a = trans_[bbIdToThisBBIndex[replacedbbId]] * bbs_[bbIdToThisBBIndex[replacedbbId]]->cm_;
+                        } else if (bbId == identGroup[j]) {
+                            unsigned int replacedbbId = identGroup[i];
+                            a = trans_[bbIdToThisBBIndex[replacedbbId]] * bbs_[bbIdToThisBBIndex[replacedbbId]]->cm_;
                         } else {
-                            a = trans_[bbIdToThisBBIndex[bitId]] * bbs_[bbIdToThisBBIndex[bitId]]->cm_;
+                            a = trans_[bbIdToThisBBIndex[bbId]] * bbs_[bbIdToThisBBIndex[bbId]]->cm_;
                         }
                         cmA.add(a);
                         Vector3 b =
-                            other.trans_[bbIdToOtherBBIndex[bitId]] * other.bbs_[bbIdToOtherBBIndex[bitId]]->cm_;
+                            other.trans_[bbIdToOtherBBIndex[bbId]] * other.bbs_[bbIdToOtherBBIndex[bbId]]->cm_;
                         cmB.add(b);
                     }
                     for (unsigned int i = 0; i < size_; i++) {
@@ -233,13 +235,13 @@ double SuperBB::calcRmsd(const SuperBB &other, std::vector<std::vector<unsigned 
 
     Match match;
     Molecule<Atom> A, B;
-    for (unsigned int bitId : bbIdsInThis) {
-        Molecule<Atom> molA = bbs_[bbIdToThisBBIndex[bitId]]->caAtoms_;
-        molA.rigidTrans(trans_[bbIdToThisBBIndex[bitId]]);
+    for (unsigned int bbId : bbIdsInThis) {
+        Molecule<Atom> molA = bbs_[bbIdToThisBBIndex[bbId]]->caAtoms_;
+        molA.rigidTrans(trans_[bbIdToThisBBIndex[bbId]]);
         A.concat(molA);
 
-        Molecule<Atom> molB = other.bbs_[bbIdToOtherBBIndex[bitId]]->caAtoms_;
-        molB.rigidTrans(other.trans_[bbIdToOtherBBIndex[bitId]]);
+        Molecule<Atom> molB = other.bbs_[bbIdToOtherBBIndex[bbId]]->caAtoms_;
+        molB.rigidTrans(other.trans_[bbIdToOtherBBIndex[bbId]]);
         B.concat(molB);
     }
 
