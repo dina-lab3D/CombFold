@@ -278,7 +278,7 @@ void HierarchicalFold::fold(const std::string &outFileNamePrefix) {
 
         printBestK(N_, keptResultsByLength[length]);
 	// output all subsets
-        for (unsigned int i = N_; i > 1; i--) {
+        for (unsigned int i = length; i > 1; i--) {
             if (keptResultsByLength[i]->size() == 0)
                 continue;
             std::string outFileName = "tmp_cb_" + std::to_string(i) + "_" + outFileNamePrefix + ".res";
@@ -318,7 +318,7 @@ void HierarchicalFold::fold(const std::string &outFileNamePrefix) {
             break;
         }
     }
-
+    
     // cleanup
     for (const auto &[length, currBestK] : precomputedResults) {
         delete currBestK;
