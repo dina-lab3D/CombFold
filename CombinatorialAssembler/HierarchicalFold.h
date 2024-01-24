@@ -27,8 +27,7 @@ class HierarchicalFold {
             std::shared_ptr<SuperBB> sbb = std::make_shared<SuperBB>(bbContainer.getBB(i));
 
             keptResultsByLength[1]->push(sbb);
-            unsigned long one = 1;
-            unsigned long set = one << i;
+            BitId set = BitId(i);
             BestK *cb = bestKContainer_.newBestK(set);
             cb->push(sbb);
         }
