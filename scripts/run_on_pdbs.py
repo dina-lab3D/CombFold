@@ -396,7 +396,10 @@ def run_on_pdbs_folder(subunits_json_path: str, pdbs_folder: str, output_path: s
 
 
 if __name__ == '__main__':
-    if len(sys.argv) != 4:
-        print("usage: <script> subunits_info pdbs_folder output_path")
-    else:
+    if len(sys.argv) == 4:
         run_on_pdbs_folder(os.path.abspath(sys.argv[1]), os.path.abspath(sys.argv[2]), os.path.abspath(sys.argv[3]))
+    elif len(sys.argv) == 5:
+        run_on_pdbs_folder(os.path.abspath(sys.argv[1]), os.path.abspath(sys.argv[2]), os.path.abspath(sys.argv[3]),
+                           crosslinks_path=os.path.abspath(sys.argv[4]))
+    else:
+        print("usage: <script> subunits_info pdbs_folder output_path <optional: crosslinks.txt>")
