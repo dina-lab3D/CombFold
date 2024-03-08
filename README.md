@@ -1,4 +1,7 @@
 # CombFold
+Read the [paper](https://www.nature.com/articles/s41592-024-02174-0).
+
+
 The `CombFold` pipeline predicts the structure of large protein complexes starting from the sequences of chains in the complex (up to at least 18,000 amino acids and 32 subunits). 
 The pipeline uses AlphaFold-Multimer (AFM) to predict structures of "possible subcomplexes" which are combinations of subunits from the target complex. The **CombFold Combinatorial Assembly** algorithm assembles those structures into a single large complex.
 
