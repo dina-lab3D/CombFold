@@ -152,20 +152,20 @@ void HierarchicalFold::fold(const std::string &outFileNamePrefix) {
         precomputedResults[i] = new BestK(K_);
 
     // populate with homomers subunits
-    for (std::vector<unsigned int> identGroup : identGroups) {
-        for (unsigned int groupDivider = 1; (identGroup.size() / groupDivider) >= 5; groupDivider++) {
-        if ((identGroup.size() % groupDivider) != 0)
-            continue;
-        unsigned int groupSize = identGroup.size() / groupDivider;
-        std::vector<std::shared_ptr<SuperBB>> groupSBBs;
-        for (unsigned int j = 0; j < groupSize; j++) {
-            groupSBBs.push_back(*(bestKContainer_[BitId(identGroup[j])].begin()));
-        }
-        std::cout << "searching for size " << groupSBBs.size() << " has " << precomputedResults.count(groupSBBs.size())
-                  << std::endl;
-        createSymmetry(groupSBBs, *precomputedResults[groupSBBs.size()]);
-        }
-    }
+//    for (std::vector<unsigned int> identGroup : identGroups) {
+//        for (unsigned int groupDivider = 1; (identGroup.size() / groupDivider) >= 5; groupDivider++) {
+//        if ((identGroup.size() % groupDivider) != 0)
+//            continue;
+//        unsigned int groupSize = identGroup.size() / groupDivider;
+//        std::vector<std::shared_ptr<SuperBB>> groupSBBs;
+//        for (unsigned int j = 0; j < groupSize; j++) {
+//            groupSBBs.push_back(*(bestKContainer_[BitId(identGroup[j])].begin()));
+//        }
+//        std::cout << "searching for size " << groupSBBs.size() << " has " << precomputedResults.count(groupSBBs.size())
+//                  << std::endl;
+//        createSymmetry(groupSBBs, *precomputedResults[groupSBBs.size()]);
+//        }
+//    }
 
     // Hierarchical Assembly
     for (unsigned int length = 2; length <= N_; length++) { // # subunits iteration
