@@ -36,7 +36,7 @@ class HierarchicalFold {
 
     void fold(const std::string &outFileNamePrefix);
 
-    void tryToConnect(int id, SuperBB &sbb1, SuperBB &sbb2, BestK &results, bool toAdd,
+    void tryToConnect(int id, const SuperBB &sbb1, const SuperBB &sbb2, BestK &results, bool toAdd,
                       std::promise<int> &output, std::vector<std::vector<unsigned int>> &identGroups);
     
     bool filterTrans(const SuperBB &sbb1, const SuperBB &sbb2, const RigidTrans3 &trans) const;
@@ -58,7 +58,7 @@ class HierarchicalFold {
     void checkConnectivity() const;
 
     void outputConnectivityGraph(std::string outFileName = "graph.sif") const;
-    float computeNewTransScore(SuperBB &sbb1, SuperBB &sbb2, TransIterator2 &it,
+    float computeNewTransScore(const SuperBB &sbb1, const SuperBB &sbb2, TransIterator2 &it,
                                                  const int orig_firstBB_id, const int orig_secondBB_id);
 
     // members

@@ -317,7 +317,7 @@ void HierarchicalFold::fold(const std::string &outFileNamePrefix) {
     }
 }
 
-float HierarchicalFold::computeNewTransScore(SuperBB &sbb1, SuperBB &sbb2, TransIterator2 &it,
+float HierarchicalFold::computeNewTransScore(const SuperBB &sbb1, const SuperBB &sbb2, TransIterator2 &it,
                                              const int orig_firstBB_id, const int orig_secondBB_id) {
     float total_score = it.getScore();
     for (int i = 0; i < (int)sbb1.bbs_.size(); i++) {
@@ -343,7 +343,7 @@ float HierarchicalFold::computeNewTransScore(SuperBB &sbb1, SuperBB &sbb2, Trans
     return total_score;
 }
 
-void HierarchicalFold::tryToConnect(int id, SuperBB &sbb1, SuperBB &sbb2, BestK &results, bool toAdd,
+void HierarchicalFold::tryToConnect(int id, const SuperBB &sbb1,const SuperBB &sbb2, BestK &results, bool toAdd,
                                     std::promise<int> &output, std::vector<std::vector<unsigned int>> &identGroups) {
     // iterate over pairs of BBs os SuperBB1 and SuperBB2
     for (int i = 0; i < (int)sbb1.bbs_.size(); i++) {
