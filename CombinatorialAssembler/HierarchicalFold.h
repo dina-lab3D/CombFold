@@ -58,7 +58,7 @@ class HierarchicalFold {
     void checkConnectivity() const;
 
     void outputConnectivityGraph(std::string outFileName = "graph.sif") const;
-    float HierarchicalFold::computeNewTransScore(const SuperBB &sbb1, const SuperBB &sbb2, TransIterator2 &it,
+    float computeNewTransScore(const SuperBB &sbb1, const SuperBB &sbb2, TransIterator2 &it,
                                                  const int orig_firstBB_id, const int orig_secondBB_id);
 
     // members
