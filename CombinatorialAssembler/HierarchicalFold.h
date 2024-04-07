@@ -59,7 +59,7 @@ class HierarchicalFold {
 
     void outputConnectivityGraph(std::string outFileName = "graph.sif") const;
     float computeNewTransScore(SuperBB &sbb1, SuperBB &sbb2, TransIterator2 &it,
-                                                 const int orig_firstBB_id, const int orig_secondBB_id) const;
+                                                 const int orig_firstBB_id, const int orig_secondBB_id);
 
     // members
     static Timer timer_, timerAll_;
