@@ -343,7 +343,7 @@ float HierarchicalFold::computeNewTransScore(SuperBB &sbb1, SuperBB &sbb2, Trans
     return total_score;
 }
 
-void HierarchicalFold::tryToConnect(int id, const SuperBB &sbb1, const SuperBB &sbb2, BestK &results, bool toAdd,
+void HierarchicalFold::tryToConnect(int id, SuperBB &sbb1, SuperBB &sbb2, BestK &results, bool toAdd,
                                     std::promise<int> &output, std::vector<std::vector<unsigned int>> &identGroups) {
     // iterate over pairs of BBs os SuperBB1 and SuperBB2
     for (int i = 0; i < (int)sbb1.bbs_.size(); i++) {

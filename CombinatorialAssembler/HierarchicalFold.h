@@ -36,7 +36,7 @@ class HierarchicalFold {
 
     void fold(const std::string &outFileNamePrefix);
 
-    void tryToConnect(int id, const SuperBB &sbb1, const SuperBB &sbb2, BestK &results, bool toAdd,
+    void tryToConnect(int id, SuperBB &sbb1, SuperBB &sbb2, BestK &results, bool toAdd,
                       std::promise<int> &output, std::vector<std::vector<unsigned int>> &identGroups);
     
     bool filterTrans(const SuperBB &sbb1, const SuperBB &sbb2, const RigidTrans3 &trans) const;
