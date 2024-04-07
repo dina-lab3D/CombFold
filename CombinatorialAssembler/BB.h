@@ -101,7 +101,7 @@ class BB {
     ChemMolecule backBone_;
     ChemMolecule allAtoms_;
     Molecule<Atom> caAtoms_;
-    TransformDistance transformDistance(caAtoms_);
+    TransformDistance transformDistance_;
     std::map<unsigned int, Atom> resIndexToCAAtom;
 };
 

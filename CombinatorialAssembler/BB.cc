@@ -51,7 +51,7 @@ BB::BB(int id, const std::string pdbFileName, int groupID, const ChemLib &lib, f
             maxRadius_ = r;
     }
     std::cout << "Max radius: " << maxRadius_ << std::endl;
-
+    transformDistance_ = TransformDistance(caAtoms_);
     std::cout << " done reading BB " << pdbFileName_.c_str() << std::endl;
 }
 
