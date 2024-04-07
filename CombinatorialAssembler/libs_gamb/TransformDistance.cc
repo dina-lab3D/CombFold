@@ -1,6 +1,6 @@
 #include "TransformDistance.h"
 
-float TransformDistance::rmsd2(const RigidTrans3& trans1, const RigidTrans3& trans2) {
+float TransformDistance::rmsd2(const RigidTrans3& trans1, const RigidTrans3& trans2) const{
     // compute rotation matrix
     Matrix3 A = trans1.rotation().transposeMatrix() * trans2.rotation();
 

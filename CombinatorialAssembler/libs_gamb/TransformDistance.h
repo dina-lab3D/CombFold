@@ -48,10 +48,10 @@ public:
     TransformDistance(const std::vector<ParticleT>& pointSet);
 
     //// returns rmsd between two transformations
-    float rmsd(const RigidTrans3& trans1, const RigidTrans3& trans2) { return sqrt(rmsd2(trans1, trans2)); }
+    float rmsd(const RigidTrans3& trans1, const RigidTrans3& trans2) const { return sqrt(rmsd2(trans1, trans2)); }
 
     //// returns squared rmsd between two transformations
-    float rmsd2(const RigidTrans3& trans1, const RigidTrans3& trans2);
+    float rmsd2(const RigidTrans3& trans1, const RigidTrans3& trans2) const;
 
     //// returns rmsd between point set and point set after applying the transformation
     float rmsd(const RigidTrans3& trans) { return sqrt(rmsd2(trans)); }
