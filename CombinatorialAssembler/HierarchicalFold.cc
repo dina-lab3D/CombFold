@@ -317,6 +317,32 @@ void HierarchicalFold::fold(const std::string &outFileNamePrefix) {
     }
 }
 
+float HierarchicalFold::computeNewTransScore(const SuperBB &sbb1, const SuperBB &sbb2, const TransIterator2 &it,
+                                             const int orig_firstBB_id, const int orig_secondBB_id) {
+    float total_score = it.get_score();
+    for (int i = 0; i < (int)sbb1.bbs_.size(); i++) {
+        int firstBB_id = sbb1.bbs_[i]->getID(); //todo: ID?
+        for (int j = 0; j < (int) sbb2.bbs_.size(); j++) {
+            int secondBB_id = sbb2.bbs_[j]->getID();
+
+            if (orig_firstBB_id == firstBB_id && orig_secondBB_id == secondBB_id) {
+                continue;
+            }
+
+            // loop over possible transformations between BBs
+            for (TransIterator2 it2(sbb1, sbb2, firstBB_id, secondBB_id); !it2.isAtEnd(); it2++) {
+                float rmsdBetweenBBs = sbb1.bbs_[i].transformationDistance(sbb1.trans_[i] - sbb2.trans_[j],
+                                                                      it2.transformation());
+                if (rmsdBetweenBBs < 10) { //todo: threshold
+                    std::cout<< "found extra interface" << std::endl;
+                    total_score += it2.get_score()
+                }
+            }
+        }
+    }
+    return total_score;
+}
+
 void HierarchicalFold::tryToConnect(int id, const SuperBB &sbb1, const SuperBB &sbb2, BestK &results, bool toAdd,
                                     std::promise<int> &output, std::vector<std::vector<unsigned int>> &identGroups) {
     // iterate over pairs of BBs os SuperBB1 and SuperBB2
@@ -336,9 +362,10 @@ void HierarchicalFold::tryToConnect(int id, const SuperBB &sbb1, const SuperBB &
                 bool filtered = filterTrans(sbb1, sbb2, it.transformation());
                 if (filtered)
                     continue;
+                float transScore = computeNewTransScore(sbb1, sbb2, it, firstBB, secondBB);
 
                 FoldStep step(firstBB, secondBB, it.getScore());
-                std::shared_ptr<SuperBB> theNew = createJoined(sbb1, sbb2, it.transformation(), 0, step, it.getScore());
+                std::shared_ptr<SuperBB> theNew = createJoined(sbb1, sbb2, it.transformation(), 0, step, transScore);
 
                 if (theNew->getRestraintsRatio() < restraintsRatioThreshold_) {
                     //            std::cout << "not enough restraints " << theNew->getRestraintsRatio() << " : " <<

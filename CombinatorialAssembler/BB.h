@@ -10,6 +10,7 @@
 #include <RigidTrans3.h>
 #include <Surface.h>
 #include <Vector3.h>
+#include <TransformDistance.h> //todo: how does it find it?
 
 #include <vector>
 
@@ -100,6 +101,7 @@ class BB {
     ChemMolecule backBone_;
     ChemMolecule allAtoms_;
     Molecule<Atom> caAtoms_;
+    TransformDistance transformDistance(caAtoms_);
     std::map<unsigned int, Atom> resIndexToCAAtom;
 };
 
