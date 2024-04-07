@@ -330,13 +330,14 @@ float HierarchicalFold::computeNewTransScore(const SuperBB &sbb1, const SuperBB 
             }
 
             // loop over possible transformations between BBs
+            float to_add_score = 0;
             for (TransIterator2 it2(sbb1, sbb2, firstBB_id, secondBB_id); !it2.isAtEnd(); it2++) {
                 float rmsdBetweenBBs = sbb1.bbs_[i]->transformDistance_.rmsd(
                         !sbb1.trans_[i] * it.transformation() * sbb2.trans_[j],
 //                        sbb1.trans_[i] * it.transformation() * !sbb2.trans_[j],
 //                        !sbb1.trans_[i] * !it.transformation() * sbb2.trans_[j],
                         it2.transformation()); //todo - operator-?
-                float to_add_score = 0;
+
                 if (rmsdBetweenBBs < 3) { //todo: threshold
                     std::cout<< "found extra interface: " << rmsdBetweenBBs  << ", " <<
                     sbb1.trans_[i]<<" " << it.transformation() << " " << sbb2.trans_[j] <<
@@ -345,8 +346,8 @@ float HierarchicalFold::computeNewTransScore(const SuperBB &sbb1, const SuperBB 
 //                    total_score += it2.getScore();
                     to_add_score = std::max(to_add_score, it2.getScore());
                 }
-                total_score += to_add_score;
             }
+            total_score += to_add_score;
         }
     }
     return total_score;
