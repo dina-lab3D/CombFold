@@ -336,13 +336,16 @@ float HierarchicalFold::computeNewTransScore(const SuperBB &sbb1, const SuperBB 
 //                        sbb1.trans_[i] * it.transformation() * !sbb2.trans_[j],
 //                        !sbb1.trans_[i] * !it.transformation() * sbb2.trans_[j],
                         it2.transformation()); //todo - operator-?
+                float to_add_score = 0;
                 if (rmsdBetweenBBs < 3) { //todo: threshold
                     std::cout<< "found extra interface: " << rmsdBetweenBBs  << ", " <<
                     sbb1.trans_[i]<<" " << it.transformation() << " " << sbb2.trans_[j] <<
                     " " << !sbb1.trans_[i] * it.transformation() * sbb2.trans_[j] <<
                     " " << it2.transformation() << std::endl;
-                    total_score += it2.getScore();
+//                    total_score += it2.getScore();
+                    to_add_score = std::max(to_add_score, it2.getScore());
                 }
+                total_score += to_add_score;
             }
         }
     }
@@ -370,7 +373,7 @@ void HierarchicalFold::tryToConnect(int id, const SuperBB &sbb1,const SuperBB &s
                     continue;
                 float transScore = computeNewTransScore(sbb1, sbb2, it, firstBB, secondBB);
 
-                FoldStep step(firstBB, secondBB, it.getScore());
+                FoldStep step(firstBB, secondBB, transScore);
                 std::shared_ptr<SuperBB> theNew = createJoined(sbb1, sbb2, it.transformation(), 0, step, transScore);
 
                 if (theNew->getRestraintsRatio() < restraintsRatioThreshold_) {
