@@ -2,6 +2,7 @@
 
 #include <boost/graph/adjacency_list.hpp>
 #include <boost/graph/connected_components.hpp>
+#include <cmath>
 
 Timer HierarchicalFold::timer_;
 Timer HierarchicalFold::timerAll_;
@@ -355,7 +356,8 @@ float HierarchicalFold::computeNewTransScore(const SuperBB &sbb1, const SuperBB 
                     " " << !sbb1.trans_[i] * it.transformation() * sbb2.trans_[j] <<
                     " " << it2.transformation() << std::endl;
 //                    total_score += it2.getScore();
-                    to_add_score = std::max(to_add_score, it2.getScore());
+		    float factor = std::max((float)0.0, 1-(rmsdBetweenBBs/5));
+                    to_add_score = std::max(to_add_score, it2.getScore()*factor);
                 }
             }
             total_score += to_add_score;
