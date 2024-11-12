@@ -4,6 +4,7 @@ from collections import defaultdict
 from typing import List, Optional, Dict, Tuple
 import Bio.PDB
 import Bio.SeqUtils
+
 import numpy as np
 import scipy.spatial.distance
 
